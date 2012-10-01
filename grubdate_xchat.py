@@ -50,7 +50,7 @@ import xchat
 import httplib, time, rfc822, ConfigParser
 
 __module_name__  = "grubdate"  # it's a Homestuck joke
-__module_version__  = "20120910"
+__module_version__  = "20120929"
 __module_description__  = "website update check"
 __module_author__  =  "Mozai <moc.iazom@sesom>"
 
