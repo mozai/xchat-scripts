@@ -1,150 +1,130 @@
-__module_name__  = "MOCP_info"
-__module_version__  = "1"
-__module_description__  = "MOCP Info Script"
-__module_author__  =  "Mozai, kubicz10"
-
-# Personalize this plugin by editing source code.
-# I release this under terms of GPL license, http://www.gnu.org/copyleft/gpl.html
-
-# Known commands:
-# mocp         :displays current song information just to you
-# mocp_emote   :announces song information to current channel
-# mocp_full_info :'mocp' output spewed to current channel
-# mocp_stop    :stops mocp from playing
-# mocp_play    :start mocp
-# mocp_next    :plays next song
-# mocp_prev    :plays previous song
-# mocp_toggle  :toggles between play and pause
-# mocp_exit    :shutdown mocp.
+""" Xchat module for controlling the Music On Console Player (MOCP)
+    program.  Inspired by similar work by kubicz10
+"""
+from __future__ import print_function
 import xchat
 import commands
 
-def _mocp_info():
-  infodump = commands.getoutput("mocp -i")
-  mocpinfo = dict()
+__module_name__  = "MOCP_control"
+__module_version__  = "20121202"
+__module_description__  = "control music from inside xchat"
+__module_author__  =  "Mozai, kubicz10"
+
+def _mocp_status():
+  " returns dict() of mocp state info "
+  commands.getoutput('mocp --server') # fails silently if unnecessary
+  infodump = commands.getoutput("mocp --info")
+  mocpinfo = { }
   for line in str(infodump).split("\n"):
-    fields = line.split(': ',2)
-    mocpinfo[fields[0]] = fields[1].strip()
+    fields = line.split(': ', 2)
+    if fields[1].strip():
+      mocpinfo[fields[0]] = fields[1].strip()
+  if not mocpinfo :
+    raise Exception("mocp --info could not be parsed")
+  mocpinfo.setdefault('State','UNKNOWN') # just in case
   return mocpinfo
 
-def mocp_emote(word,word_eol,userdata):
-  #Info Full#
-  mocpinfo = _mocp_info()
-  if (mocpinfo.has_key('State') and mocpinfo['State'] == "STOP"):
+def _mocp_help():
+  print("\002/mocp\002 ["+", ".join(PARAMS.keys())+"]")
+
+def _mocp_np():
+  mocpinfo = _mocp_status()
+  if (mocpinfo['State'] == "STOP"):
     print("mocp isnt running")
   else:
-    blurb = ''
-    for k in ('Artist','Album','SongTitle'):
-      if (mocpinfo.has_key(k) and mocpinfo[k]):
-        blurb += '%s - ' % mocpinfo[k]
-    if blurb:
-      blurb = blurb[:-3]
-    elif (mocpinfo.has_key('SongTitle')):
-      blurb += '%s' % mocpinfo['SongTitle']
-    elif (mocpinfo.has_key('File')):
-      blurb += '%s' % mocpinfo['File']
-    if (blurb):
+    blurb = [mocpinfo[i] for i in ('Artist', 'Album', 'SongTitle') if mocpinfo.get(i)]
+    if blurb :
+      blurb = " - ".join(blurb)
       xchat.command("me is listening to \002%s\002" % blurb)
+    elif mocpinfo.get('File'):
+      blurb = mocpinfo['File'][mocpinfo['File'].rfind('/')+1:]
+      xchat.command("me is playing \002%s\002" % blurb)
     else:
-      print("mocpinfo is empty? ( %s )" % str(mocpinfo))
-  return xchat.EAT_ALL
-xchat.hook_command("mocp_emote", mocp_emote, help="Announces MOCP info in current channel")
+      print("?? mocp info seems empty (%s)" % repr(mocpinfo))
 
-def mocp_full_info(word,word_eol,userdata):
-  mocpinfo = _mocp_info()
-  if (mocpinfo.has_key('State') and mocpinfo['State'] == "STOP"):
-    print("mocp isnt running")
-  if (mocpinfo.has_key('State') and mocpinfo['State'] == "STOP"):
-    print("mocp isnt running")
+def _mocp_play():
+  mocpinfo = _mocp_status()
+  if (mocpinfo['State'] == "PLAY"):
+    print ("mocp is already playing")
   else:
-    ks = mocpinfo.keys()
-    if (len(ks) <= 0):
-      print("mocpinfo is empty? ( %s )" % str(mocpinfo))
-    else:
-      ks.sort()
-      blurb = ''
-      for k in ks:
-        if (mocpinfo[k]):
-          blurb += "\002%s\002 %s " % (k,mocpinfo[k])
-      xchat.command("me %s" % blurb)
-  return xchat.EAT_ALL
-xchat.hook_command("mocp_full_info", mocp_full_info, help="Spews MOCP info to channel")
-
-def mocp_local_info(word,word_eol,userdata):
-  #Info Local#
-  mocpinfo = _mocp_info()
-  if (mocpinfo.has_key('State') and mocpinfo['State'] == "STOP"):
-    print("mocp isnt running")
-  else:
-    ks = mocpinfo.keys()
-    if (len(ks) <= 0):
-      print("mocpinfo is empty? ( %s )" % str(mocpinfo))
-    else:
-      ks.sort()
-      blurb = ''
-      for k in ks:
-        if (mocpinfo[k]):
-          blurb += "\002%s\002 %s " % (k,mocpinfo[k])
-      print(blurb)
-  return xchat.EAT_ALL
-xchat.hook_command("mocp", mocp_local_info, help="Prints MOCP info")
-
-def mocp_stop_playing(word,word_eol,userdata):
-  #Stop playing#
-  mocpinfo = _mocp_info()
-  if (mocpinfo.has_key('State') and mocpinfo['State'] == "STOP"):
-    print ("mocp is stoped or not running")
-  else:
-    commands.getoutput("mocp -s")
-    print("stopping mocp")
-  return xchat.EAT_ALL
-xchat.hook_command("mocp_stop", mocp_stop_playing, help="Stop playing.")
-
-def mocp_play(word,word_eol,userdata):
-  #Start playing#
-  mocpinfo = _mocp_info()
-  if (mocpinfo.has_key('State') and mocpinfo['State'] == "PLAY"):
-    print ("mocp is playing")
-  else:
-    commands.getoutput("mocp -p")
     print("mocp starts playing")
-  return xchat.EAT_ALL
-xchat.hook_command("mocp_play", mocp_play, help="Start playing from the first item on the playlist.")
+    commands.getoutput("mocp --play")
 
-def mocp_next(word,word_eol,userdata):
-  #Next song#
-  commands.getoutput("mocp -f")
-  print("mocp jumps to next song")
-  return xchat.EAT_ALL
-xchat.hook_command("mocp_next", mocp_next, help="Play next song.")
-
-def mocp_previous(word,word_eol,userdata):
-  #Previous song#
-  commands.getoutput("mocp -r")
-  print("mocp jumps to previous song")
-  return xchat.EAT_ALL
-xchat.hook_command("mocp_prev", mocp_previous, help="Play previous song.")
-
-def mocp_toggle(word,word_eol,userdata):
-  #Toggle play/pause#
-  mocpinfo = _mocp_info()
-  if (mocpinfo.has_key('State') and mocpinfo['State'] == "PAUSE"):
-    commands.getoutput("mocp -G")
-    print("mocp unpaused")
-  elif (mocpinfo.has_key('State') and mocpinfo['State'] == "PLAY"):
-    commands.getoutput("mocp -G")
-    print("mocp paused")
+def _mocp_stop():
+  mocpinfo = _mocp_status()
+  if (mocpinfo['State'] == "STOP"):
+    print ("mocp isn't playing")
   else:
-    print("mocp is stoped or isnt running")
-  return xchat.EAT_ALL
-xchat.hook_command("mocp_toggle", mocp_toggle, help="Toggle between play/pause.")
+    print("stopping mocp")
+    commands.getoutput("mocp --stop")
 
-def mocp_exit(word,word_eol,userdata):
-  #Exit mocp#
-  commands.getoutput("mocp -x")
-  print("mocp is off")
-  return xchat.EAT_ALL
-xchat.hook_command("mocp_exit", mocp_exit, help="Shutdown MOCP.")
+def _mocp_pause():
+  mocpinfo = _mocp_status()
+  # using toggle-pause because it's more likely what's expected
+  if (mocpinfo['State'] == "PLAY"):
+    print("pausing mocp")
+    commands.getoutput("mocp --toggle-pause")    
+  elif (mocpinfo['State'] == 'PAUSE'):
+    print("resuming mocp")
+    commands.getoutput("mocp --toggle-pause")
+  else:
+    print("mocp starts playing again")
+    commands.getoutput("mocp --play")
 
-print "XChat MOCP Info Script (python)"
+def _mocp_next():
+  mocpinfo = _mocp_status()
+  if (mocpinfo['State'] == "STOP"):
+    print("mocp isn't playing")
+  else:
+    print("mocp skipping to next track")
+    commands.getoutput("mocp --next")
 
+def _mocp_prev():
+  mocpinfo = _mocp_status()
+  if (mocpinfo['State'] == "STOP"):
+    print("mocp isn't playing")
+  else:
+    print("mocp skipping to previous track")
+    commands.getoutput("mocp --prev")
+
+def _mocp_exit():
+  print("killing mocp")
+  commands.getoutput("mocp --exit")
+
+def _mocp_info():
+  mocpinfo = _mocp_status()
+  mks = [ i for i in mocpinfo.keys() if i ]
+  mks.sort()
+  blurb = ''
+  for i in mks:
+    blurb += "\002%s\002 %s " % (i, mocpinfo[i])
+  print(blurb)
+
+
+PARAMS = { 'help':  _mocp_help,
+           'np':    _mocp_np,
+           'play':  _mocp_play,
+           'stop':  _mocp_stop,
+           'pause': _mocp_pause,
+           'next':  _mocp_next,
+           'prev':  _mocp_prev,
+           'info':  _mocp_info,
+           'exit':  _mocp_exit,
+        }
+
+def mocp(word, word_eol, userdata):
+  " dispatcher for the commands in PARAMS dict() "
+  if (len(word)) < 2 :
+    goto = _mocp_info
+  else:
+    goto = PARAMS.get(word[1], _mocp_help)
+  goto()
+  return xchat.EAT_PLUGIN
+xchat.hook_command('mocp', mocp , help='/mocp help for what you can do')
+
+commands.getoutput("mocp --server") # starts it if necessary
+print("\002%s\002 (%s) %s" % (__module_name__, __module_version__, __module_description__))
+_mocp_help()
+
+xchat.hook_command('np', _mocp_np, help='same as /mocp np')
+print("\002/np\002 : emotes to current channel what you're listening to")
