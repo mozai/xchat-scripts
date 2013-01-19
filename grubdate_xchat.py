@@ -9,7 +9,7 @@
     [DEFAULT]
     checkpause=120
     askpause=600
-    
+
     [mspa]
     name=MSPA rss feed
     host=mspaintadventures.com
@@ -57,6 +57,9 @@ __module_author__  =  "Mozai <moc.iazom@sesom>"
 # read the grubdate.ini file
 CONF = ConfigParser.ConfigParser(allow_no_value=True)
 INI_LOADED = CONF.read(INI_FILE)
+if len(INI_LOADED) < 1 :
+  INI_LOADED = CONF.read('./grubdate.ini')
+  print "...attempting to load ./grubdate.ini instead."
 if len(INI_LOADED) > 0 :
   SITES = dict()
   for SITE in CONF.sections():
@@ -93,7 +96,7 @@ def _latestSBaHJpath ():
     return False
 
 def _secsToPretty(ticks=0):
-  " given ticks as a duration in seconds, convert it to human-friendly units "
+  " given ticks as a duration in seconds, in human-friendly units "
   day, remain    = divmod(ticks, (24*60*60))
   hour, remain   = divmod(remain, (60*60))
   minute, second = divmod(remain, 60)

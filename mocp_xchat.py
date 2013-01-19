@@ -125,7 +125,7 @@ xchat.hook_command('mocp', mocp , help='/mocp help for what you can do')
 def mocp_np(word, word_eol, userdata):
   _mocp_np()
   return xchat.EAT_PLUGIN
-xchat.hook_command('np', _mocp_np, help='same as /mocp np')
+xchat.hook_command('np', mocp_np, help='same as /mocp np')
 
 print("\002%s\002 (%s) %s" % (__module_name__, __module_version__, __module_description__))
 commands.getoutput("mocp --server") # starts it if necessary
