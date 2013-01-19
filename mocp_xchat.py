@@ -122,9 +122,13 @@ def mocp(word, word_eol, userdata):
   return xchat.EAT_PLUGIN
 xchat.hook_command('mocp', mocp , help='/mocp help for what you can do')
 
-commands.getoutput("mocp --server") # starts it if necessary
-print("\002%s\002 (%s) %s" % (__module_name__, __module_version__, __module_description__))
-_mocp_help()
-
+def mocp_np(word, word_eol, userdata):
+  _mocp_np()
+  return xchat.EAT_PLUGIN
 xchat.hook_command('np', _mocp_np, help='same as /mocp np')
+
+print("\002%s\002 (%s) %s" % (__module_name__, __module_version__, __module_description__))
+commands.getoutput("mocp --server") # starts it if necessary
+_mocp_help()
 print("\002/np\002 : emotes to current channel what you're listening to")
+
