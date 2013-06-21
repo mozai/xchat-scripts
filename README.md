@@ -33,6 +33,13 @@ This script adds commands to XChat to control MOC with XChat commands, so
 you do not need to leave your IRC session.  You can also (discretely) 
 emit to yourself or the current channel what you are currently listening to.
 
+clementine\_xchat.py
+--------------------
+Another widget for controlling a media player without leaving IRC.
+Clementine is the player that looks awfully similar to Amarok, but
+uses Qt libraries instead of GTK, in case you're allergic to GNOMEs.
+It can be queried and instructed via dbus.
+
 madlibs\_xchat.py
 -----------------
 Coming soon.  This will be an interface for using my 
