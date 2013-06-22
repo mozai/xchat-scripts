@@ -9,7 +9,7 @@ __module_version__  = "20130620"
 __module_description__  = "control music from inside xchat"
 __module_author__  =  "Mozai"
 
-BUS = dbus.SessionBus()
+
 # MPRIS GetStatus() = [ [Playing, Paused, Stopped],
 #                       [Sequential, Shuffle], 
 #                       [Play Song Once, Repeat Song],
@@ -18,6 +18,9 @@ BUS = dbus.SessionBus()
 
 def _clementine_iface():
   try:
+    BUS = dbus.SessionBus() 
+    # I tried leaving BUS as a module global, but it stopped working
+    # do dbus sessions time out?
     playr = BUS.get_object('org.mpris.clementine', '/Player')
     iface = dbus.Interface(playr, dbus_interface='org.freedesktop.MediaPlayer')
     return iface
