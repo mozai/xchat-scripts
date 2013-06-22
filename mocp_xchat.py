@@ -79,8 +79,8 @@ def mocp_help(mocstate):
   
 def mocp_np(mocstate):
   if (mocstate['State'] == "STOP"):
-    print("mocp isnt running")
-    return xchat.EAT_PLUGIN
+    # could be not running; maybe you're using a different music player
+    return xchat.EAT_NONE
   blurb = [mocstate[i] for i in ('Artist', 'SongTitle') if mocstate.get(i)]
   if blurb :
     blurb = " - ".join(blurb)
