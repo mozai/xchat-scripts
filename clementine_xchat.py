@@ -35,13 +35,13 @@ def clem_np(iface):
   if tna:
     tna = " - ".join(tna)
     tna = tna[:255] # sanity check
-    xchat.command("me is listening to \x02%s\x02" % tna)
+    xchat.command("me is listening to \x02%s\x02" % tna.encode('utf-8') )
   elif loc:
     if(loc.startswith('file:')):
       # I want not the full path
       loc = loc[loc.rfind('/', 0, loc.rfind('/'))+1:]
       loc = loc[:255] # sanity check
-    xchat.command("me is listening to \x02%s\x02" % loc)
+    xchat.command("me is listening to \x02%s\x02" % loc.encode('utf-8'))
   else:
     print("clementine isn't playing")
   return xchat.EAT_NONE
@@ -82,7 +82,7 @@ def clem_info(iface):
     blurb = ''
     for i in sorted(mdata.keys()): 
       blurb += "\x02%s\x02 %s " % (str(i), str(mdata[i]))
-    print(blurb)
+    print(blurb.encode('utf-8'))
   else:
     print("clementine not playing?")
 

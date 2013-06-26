@@ -71,7 +71,7 @@ def mocp_info(mocstate):
   blurb = ''
   for i in mks:
     blurb += "\x02%s\x02 %s " % (i, mocstate[i])
-  print(blurb)
+  print(blurb.encode('utf-8'))
 
 def mocp_help(mocstate):
   del(mocstate)
@@ -84,12 +84,12 @@ def mocp_np(mocstate):
   blurb = [mocstate[i] for i in ('Artist', 'SongTitle') if mocstate.get(i)]
   if blurb :
     blurb = " - ".join(blurb)
-    xchat.command("me is listening to \x02%s\x02" % blurb)
+    xchat.command("me is listening to \x02%s\x02" % blurb.encode('utf-8'))
   elif mocstate.get('File'):
     blurb = mocstate['File'][mocstate['File'].rfind('/')+1:]
-    xchat.command("me is playing \x02%s\x02" % blurb)
+    xchat.command("me is playing \x02%s\x02" % blurb.encode('utf-8'))
   else:
-    print("?? mocp info seems empty (%s)" % repr(mocstate)) 
+    print("?? mocp info seems empty (%s)" % repr(mocstate.encode('utf-8'))) 
 
 PARAMS = { 'help':  mocp_help,
            'np':    mocp_np,
