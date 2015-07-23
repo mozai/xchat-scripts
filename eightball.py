@@ -69,6 +69,7 @@ def eightball_say(word, word_eol, userdata):
   xchat.command("me shakes the %s. \x0300,02 %s \x0f" % (_eightball_name(), _get_answer()))
   return xchat.EAT_ALL
 xchat.hook_command('8ball_say', eightball_say, help='shake your eightball in public')
+xchat.hook_command('eightball_say', eightball_say, help='shake your eightball in public')
 
 
 def eightball_trigger(word, word_eol, userdata):
@@ -92,4 +93,4 @@ xchat.hook_print('Channel Message', eightball_trigger)
 xchat.hook_print('Your Message', eightball_trigger)
 
 
-print "eightball loaded (/eightball, /eithball_say, !eightball, !8ball)"
+print "eightball loaded (/eightball, /eightball_say, !eightball, !8ball)"
