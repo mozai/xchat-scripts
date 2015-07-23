@@ -14,7 +14,7 @@ __module_description__ = "Eightball"
 __module_author__ = "Mozai <moc.iazom@sesom>"
 import xchat, random, time
 
-# IRC colours as per mIRC: 
+# IRC colours as per mIRC:
 #   \x0301 black \x0302 blue \x0302,01 blue-on-black \x0f normal
 
 ANSWERS = [
@@ -41,16 +41,24 @@ ANSWERS = [
   'Ask again later'
 ]
 
+
 def _eightball_name():
-  return random.choice(['magic Eight-ball', 'magic 8ball', 'eightball', '\u277d'])
+  return random.choice([
+    u'magic Eight-ball\u2122'.encode('utf8'),
+    '8ball',
+    'eightball',
+    u'\u277d'.encode('utf8')
+    ])
+
 
 def _get_answer():
   # global sentences
   return random.choice(ANSWERS)
 
+
 def eightball(word, word_eol, userdata):
   del(word, word_eol, userdata)  # shut up pylint
-  print "The %s says \x0302,01%s\x0f" % (_eightball_name(), _get_answer())
+  print "The %s says \x0300,02 %s \x0f" % (_eightball_name(), _get_answer())
   return xchat.EAT_ALL
 xchat.hook_command('8ball', eightball, help='shake your personal 8-ball')
 xchat.hook_command('eightball', eightball, help='shake your personal 8-ball')
@@ -58,7 +66,7 @@ xchat.hook_command('eightball', eightball, help='shake your personal 8-ball')
 
 def eightball_say(word, word_eol, userdata):
   del(word, word_eol, userdata)  # shut up, pylint
-  xchat.command("me shakes the %s. \x0302,01%s\x0f" % (_eightball_name(), _get_answer()))
+  xchat.command("me shakes the %s. \x0300,02 %s \x0f" % (_eightball_name(), _get_answer()))
   return xchat.EAT_ALL
 xchat.hook_command('8ball_say', eightball_say, help='shake your eightball in public')
 
@@ -85,4 +93,3 @@ xchat.hook_print('Your Message', eightball_trigger)
 
 
 print "eightball loaded (/eightball, /eithball_say, !eightball, !8ball)"
-
