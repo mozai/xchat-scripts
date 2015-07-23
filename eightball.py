@@ -42,7 +42,7 @@ ANSWERS = [
 ]
 
 def _eightball_name():
-  return random.choice(['Eight-ball', '8ball', '\u277d'])
+  return random.choice(['magic Eight-ball', 'magic 8ball', 'eightball', '\u277d'])
 
 def _get_answer():
   # global sentences
@@ -50,7 +50,7 @@ def _get_answer():
 
 def eightball(word, word_eol, userdata):
   del(word, word_eol, userdata)  # shut up pylint
-  print "The magic %s says \x0302,01%s\x0f" % (_eightball_name(), _get_answer())
+  print "The %s says \x0302,01%s\x0f" % (_eightball_name(), _get_answer())
   return xchat.EAT_ALL
 xchat.hook_command('8ball', eightball, help='shake your personal 8-ball')
 xchat.hook_command('eightball', eightball, help='shake your personal 8-ball')
@@ -58,7 +58,7 @@ xchat.hook_command('eightball', eightball, help='shake your personal 8-ball')
 
 def eightball_say(word, word_eol, userdata):
   del(word, word_eol, userdata)  # shut up, pylint
-  xchat.command("me shakes the magic %s. \x0302,01%s\x0f" % (_eightball_name(), _get_answer()))
+  xchat.command("me shakes the %s. \x0302,01%s\x0f" % (_eightball_name(), _get_answer()))
   return xchat.EAT_ALL
 xchat.hook_command('8ball_say', eightball_say, help='shake your eightball in public')
 
@@ -84,5 +84,5 @@ xchat.hook_print('Channel Message', eightball_trigger)
 xchat.hook_print('Your Message', eightball_trigger)
 
 
-print "eightball loaded (/eightball, /eithball_say, !eightball)"
+print "eightball loaded (/eightball, /eithball_say, !eightball, !8ball)"
 
