@@ -124,3 +124,4 @@ xchat.hook_print('Your Message', checkPrint)
 # -- main
 print "\x02Loaded %s v%s\x02" % (__module_name__, __module_version__)
 print "\x02commands:\x02 /thumblr tagname"
+print "\x02listens:\x02 !thumblr tagname"
