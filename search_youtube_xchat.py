@@ -44,9 +44,9 @@ def checkCommand(word, word_eol, userdata):
   """ respond to "/yt (search terms)" messages
       prints to local client window
   """
-  del(word, userdata)  # shut up, pylint
-  params = word_eol[1]
-  if params:
+  del(userdata)  # shut up, pylint
+  if len(word) > 1:
+    params = word_eol[1]
     found = fetchYTresults(params)[0]
     if found['id']:
       print '{} {} \x1fhttp://youtu.be/{}\x0f'.format(YOUTUBELOGO, found['title'], found['id'])
@@ -63,19 +63,27 @@ def checkPrint(word, word_eol, userdata):
   # "PRIVMSG Jane :that smells bad"
   # word[0] = 'Jane' word[1] = 'that smells bad'
   # word_eol[0] = 'Jane that smells bad' word_eol[1] = 'that smells bad'
-  cmd, params = word[1].split(' ', 1)
+  if ' ' in word[1]:
+    cmd, params = word[1].split(' ', 1)
+  else:
+    cmd, params = word[1], None
   context = xchat.get_context()
   chan = context.get_info('channel')
-  if cmd == '!yt' and params and chan in LASTUSED:
-    now = time.time()
-    if LASTUSED[chan] + TIMEOUT < now:
-      found = fetchYTresults(params)[0]
-      if found['id']:
-        context.command('me found \x02{}\x0f \x1fhttp://youtu.be/{}\x0f'.format(found['title'], found['id']))
+  if cmd == '!yt': 
+    if not params:
+      return xchat.NONE
+    if chan in LASTUSED:
+      now = time.time()
+      if LASTUSED[chan] + TIMEOUT >= now:
+        context.command('msg {} "!yt" on cooldown'.format(word[0]))
       else:
-        context.command('me couldn\'t search YouTube')
-        print '*** error searching YouTube: {}'.format(found['title'])
-      LASTUSED[chan] = now
+        found = fetchYTresults(params)[0]
+        if found['id']:
+          context.command('me found \x02{}\x0f \x1fhttp://youtu.be/{}\x0f'.format(found['title'], found['id']))
+        else:
+          context.command('me couldn\'t search YouTube')
+          print '*** error searching YouTube: {}'.format(found['title'])
+        LASTUSED[chan] = now
     return xchat.EAT_PLUGIN
 
 
