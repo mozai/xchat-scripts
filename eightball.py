@@ -2,7 +2,7 @@
 
 # -- config
 # time between saying stuff out-loud
-timeout = 120
+timeout = 60
 
 # channels to listen for the '!filthy' trigger
 channels = ['#farts', '#test', '#wetfish']
