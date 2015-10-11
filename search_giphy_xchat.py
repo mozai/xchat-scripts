@@ -1,6 +1,5 @@
-"""
-  this is a python script for use with xchat v2.x.
-"""
+" this is a python script for use with xchat v2.x. "
+# https://github.com/Giphy/GiphyAPI
 
 # -- init
 __module_name__ = "search_giphy"
