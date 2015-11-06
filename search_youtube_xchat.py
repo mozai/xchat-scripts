@@ -1,25 +1,28 @@
 """
   this is a python script for use with xchat v2.x.
 """
+import json
+import time
+import urllib
+import xchat
 
 # -- init
 __module_name__ = "search_yt"
 __module_version__ = "20151008"
 __module_description__ = "Search YouTube"
 __module_author__ = "Mozai <moc.iazom@sesom>"
-import json
-import time
-import urllib
-import xchat
-
 API_KEY = "get your own"
 TIMEOUT = 60  # seconds between emotes
 LASTUSED = {'#test': 0, '#farts': 0}  # also list of allowed channels
 
 # import os; print os.getcwd()  # QUACK
 
-APIKEY = open('.xchat2/search_youtube_xchat.apikey.txt').read().strip()
-# TODO: there has to be a way for xchat to tell me where this script was loaded from
+try:
+  # cwd is different if a module is loaded automatically or manually
+  # xchat2 is kinda silly about that
+  APIKEY = open('search_youtube_xchat.apikey.txt').read().strip()
+except IOError:
+  APIKEY = open('.xchat2/search_youtube_xchat.apikey.txt').read().strip()
 APIURL = 'https://www.googleapis.com/youtube/v3/search?part=snippet&q={}&type=video&fields=items(id%2Csnippet%2Ftitle%2Csnippet%2FpublishedAt)&key=' + APIKEY
 # 'order' paramter: ('relevance', 'date', 'rating', 'title', 'viewCount')
 YOUTUBELOGO = "\x0301,00You\x0300,04Tube\x0f"
@@ -69,7 +72,7 @@ def checkPrint(word, word_eol, userdata):
     cmd, params = word[1], None
   context = xchat.get_context()
   chan = context.get_info('channel')
-  if cmd == '!yt': 
+  if cmd == '!yt':
     if not params:
       return xchat.NONE
     if chan in LASTUSED:
