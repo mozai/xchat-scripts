@@ -43,6 +43,10 @@
 # -- config, stuff the user will want to mess with
 INI_FILE = '.xchat2/grubdate.ini'
 
+# for irc://rizon.net/#farts
+# don't speak if this nick is in the channel
+AFRAID_OF = ('jade_harley',)
+AFRAID_OF = [str.lower(A) for A in AFRAID_OF]
 
 # -- init, stuff we do only once
 import xchat
@@ -55,7 +59,7 @@ import rfc822
 import time
 
 __module_name__ = "grubdate"  # it's a Homestuck joke
-__module_version__ = "20140819"
+__module_version__ = "20150922"
 __module_description__ = "website update check"
 __module_author__ = "Mozai <moc.iazom@sesom>"
 
@@ -106,11 +110,11 @@ def _secsToPretty(ticks=0):
   day, remain = divmod(ticks, (24 * 60 * 60))
   hour, remain = divmod(remain, (60 * 60))
   minute, second = divmod(remain, 60)
-  if (day > 0):
+  if day > 0:
     return "%dd %dh" % (day, hour)
-  elif (hour > 0):
+  elif hour > 0:
     return "%dh %dm" % (hour, minute)
-  elif (minute > 0):
+  elif minute > 0:
     return "%dm %ds" % (minute, second)
   else:
     return "less than a minute"
@@ -121,8 +125,8 @@ def _getLastModified(site):
   if request is less than SITES[]['checkpause'] ago, returns cached answer
   """
   now = time.mktime(time.gmtime())
-  if (now >= (SITES[site]['lastchecked'] + SITES[site]['checkpause'])):
-    if (site == 'sbahj'):
+  if now >= (SITES[site]['lastchecked'] + SITES[site]['checkpause']):
+    if site == 'sbahj':
       # special case
       urpdoot = _latestSBaHJpath()
       if urpdoot:
@@ -161,14 +165,14 @@ def checkCommand(word, word_eol, userdata):
   for i in SITES:
     if ('command' in SITES[i]) and (word[0] == SITES[i]['command']):
       site = i
-  if (site == ''):
+  if site == '':
     print "huh? no site with matching command:", word[0]
     return xchat.EAT_NONE
   if 'flair' in SITES[site]:
     flair = SITES[site]['flair']
   now = time.mktime(time.gmtime())
   modtime = _getLastModified(site)
-  if (modtime):
+  if modtime:
     print "%s updated \002%s\002 ago%s" % (SITES[site]['name'], _secsToPretty(now - modtime), flair)
   else:
     print "%s couldn't get a decent update; try again later?" % SITES[site]['name']
@@ -185,14 +189,14 @@ def checkCommandEmote(word, word_eol, userdata):
   for i in SITES:
     if ('command' in SITES[i]) and (word[0] == SITES[i]['command'] + '_emote'):
       site = i
-  if (site == ''):
+  if site == '':
     print "huh? no site with matching command:", word[0]
     return xchat.EAT_NONE
   if 'flair' in SITES[site]:
     flair = SITES[site]['flair']
   now = time.mktime(time.gmtime())
   modtime = _getLastModified(site)
-  if (modtime):
+  if modtime:
     xchat.command("me is certain %s updated \002%s\002 ago%s" % (SITES[site]['name'], _secsToPretty(now - modtime), flair))
     SITES[site]['lastasked'] = now
   else:
@@ -204,9 +208,9 @@ def _in_list_or_string(needle, haystack):
   # because 'needle' in 'haystackneedle' returns True
   if haystack is None:
     return False
-  if (type(haystack) == (type({}))):
+  if type(haystack) == (type({})):
     return needle in haystack
-  elif (type(haystack) in (type(()), type([]))):
+  elif type(haystack) in (type(()), type([])):
     return needle in haystack
   elif isinstance(haystack, str):
     return needle == haystack
@@ -221,6 +225,7 @@ def checkPrint(word, word_eol, userdata):
   """
   del(word_eol, userdata)  # shut up, pylint
   context = xchat.get_context()
+  nicks = [i.nick.lower() for i in context.get_list('users')]
   chan = context.get_info('channel')
   cmd = word[1].split(' ')[0]
   if cmd == '':
@@ -229,12 +234,16 @@ def checkPrint(word, word_eol, userdata):
   site_key = None
   for site in SITES:
     if SITES[site].get('trigger') == cmd:
-      if ('channels' in SITES[site] and _in_list_or_string(chan, SITES[site]['channels'])):
+      if 'channels' in SITES[site] and _in_list_or_string(chan, SITES[site]['channels']):
         site_key = site
       else:
         # else no channels are mentioned
         site_key = site
   if not site_key:
+    return None
+  afraid_of = [i for i in nicks if i in AFRAID_OF]
+  if afraid_of:
+    print "(staying quiet because I'm scared of {})".format(afraid_of)
     return None
   site = SITES[site_key]
   flair = site.get('flair', '')
@@ -242,13 +251,13 @@ def checkPrint(word, word_eol, userdata):
   now = time.mktime(time.gmtime())
   modtime = _getLastModified(site_key)
   message = ''
-  if (modtime):
+  if modtime:
     message = "%s updated \002%s\002 ago%s" % (site['name'], _secsToPretty(now - modtime), flair)
   else:
     message = "%s update wasn't found; try again later." % site['name']
     xchat.command('msg %s %s' % (word[0], message))
     return xchat.EAT_PLUGIN
-  if (now < site['lastasked'] + site['askpause']):
+  if now < site['lastasked'] + site['askpause']:
     xchat.command('msg %s %s' % (word[0], message))
   else:
     context.command("me is certain %s" % message)
