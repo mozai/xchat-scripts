@@ -35,7 +35,7 @@ def fetchYTresults(searchterms):
     google_api_answer = json.loads(res.read())
     res.close()
     return [
-       {'id': i['id']['videoId'], 'publishedAt': i['snippet']['publishedAt'], 'title': i['snippet']['title'][:60].strip()}
+       {'id': i['id']['videoId'], 'publishedAt': i['snippet']['publishedAt'], 'title': i['snippet']['title'][:60].strip().encode('utf8')}
        for i in google_api_answer['items']
     ]
   except Exception as e:
