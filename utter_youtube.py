@@ -1,6 +1,8 @@
 """
   this is a python script for use with xchat v2.x.
 """
+# 2016-02-17 : YouTube changed their API, they're making 'textDisplay'
+#    into an empty string
 import HTMLParser
 import json
 from random import random
@@ -27,7 +29,7 @@ except IOError:
   APIKEY = open('.xchat2/search_youtube_xchat.apikey.txt').read().strip()
 APIURL1 = 'https://www.googleapis.com/youtube/v3/search?part=snippet&q={}&type=video&fields=items(id)&key=' + APIKEY
 # I want items[0]['id']
-APIURL2 = 'https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&maxResults=1&order=relevance&videoId={}&key=' + APIKEY
+APIURL2 = 'https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&maxResults=1&order=relevance&textFormat=plainText&videoId={}&key=' + APIKEY
 # I want items[0]['snippet']['toplevelComment']['snippet']['textDisplay']
 YOUTUBELOGO = "\x0301,00You\x0300,04Tube\x0f"
 HTMLPARSER = HTMLParser.HTMLParser()  # god this is dumb just to get unescape()
@@ -42,14 +44,19 @@ def fetchYTcomment(searchterms):
     res = urllib.urlopen(APIURL1.format(urllib.quote_plus(searchterms)))
     google_api1_answer = json.loads(res.read())
     res.close()
+    #print "API answer 1 : " + repr(google_api1_answer)
+    topComment = ''
     for item in google_api1_answer['items']:
       videoId = item['id']['videoId']
       res = urllib.urlopen(APIURL2.format(urllib.quote_plus(videoId)))
       google_api2_answer = json.loads(res.read())
+      #print "API answer 2 : " + repr(google_api2_answer)
       res.close()
       if len(google_api2_answer['items']) >= 1:
         snippet = google_api2_answer['items'][0]['snippet']['topLevelComment']['snippet']
         topComment = snippet['textDisplay']
+        if topComment == '' or topComment == u'':
+          continue
         topComment = HTMLPARSER.unescape(topComment)
         topComment = topComment.encode('utf8')
         topComment = re.sub('<.*?>', ' ', topComment)
@@ -65,7 +72,7 @@ def checkCommand(word, word_eol, userdata):
   del(userdata)  # shut up, pylint
   if len(word) > 1:
     wisdom = fetchYTcomment(word_eol[1])
-    xchat.command('{} {}'.format(YOUTUBELOGO, wisdom))
+    print '{} {}'.format(YOUTUBELOGO, wisdom)
   else:
     print "/ytbabble give me something to work with, eh?"
   return xchat.EAT_ALL
@@ -91,10 +98,10 @@ def checkPrint(word, word_eol, userdata):
   LASTUSED[chan] = now
   wisdom = fetchYTcomment(word[1])
   if wisdom:
-    context.command('say {}'.format(wisdom))
-    # print '{} \x0315"{}"\x0f'.format(YOUTUBELOGO, wisdom)
+    # context.command('say {}'.format(wisdom))
+    print '{} \x0315"{}"\x0f'.format(YOUTUBELOGO, wisdom)
   else:
-    # print '{} \x0315(nothing found?)\x0f'.format(YOUTUBELOGO)
+    print '{} \x0315(nothing found?)\x0f'.format(YOUTUBELOGO)
     pass
   return xchat.EAT_NONE
 
@@ -103,4 +110,5 @@ def checkPrint(word, word_eol, userdata):
 print "\x02Loaded %s v%s\x02" % (__module_name__, __module_version__)
 xchat.hook_print('Channel Message', checkPrint)
 xchat.hook_command('ytbabble', checkCommand, help='/ytbabble string (for testing only)')
+print "\x02commands:\x02 /ytbabble some_text".format(CHANCE)
 print "\x02triggers:\x02 any text, {}/1.0 % chance of response.".format(CHANCE)
