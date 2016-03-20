@@ -1,15 +1,15 @@
-# !8ball         :if someone says this, and timeout expired, /filthy_say
+" This is a module for xchat2 / hexchat "
 
 # -- config
 # time between saying stuff out-loud
-timeout = 60
+TIMEOUT = 15
 
-# channels to listen for the '!filthy' trigger
-channels = ['#farts', '#test', '#wetfish']
+# channels to listen for the '!8ball' trigger
+CHANNELS = ['#farts', '#test', '#wetfish']
 
 # -- init
 __module_name__ = "eightball"
-__module_version__ = "20150716"
+__module_version__ = "20160220"
 __module_description__ = "Eightball"
 __module_author__ = "Mozai <moc.iazom@sesom>"
 import xchat, random, time
@@ -52,7 +52,7 @@ def _eightball_name():
 
 
 def _get_answer():
-  # global sentences
+  # global ANSWERS
   return random.choice(ANSWERS)
 
 
@@ -73,23 +73,25 @@ xchat.hook_command('eightball_say', eightball_say, help='shake your eightball in
 
 
 def eightball_trigger(word, word_eol, userdata):
-  " when someone publically asks for something filthy "
+  " when someone publically asks for an augry "
   global LASTTIME
   now = int(time.time())
   context = xchat.get_context()
   chan = context.get_info('channel')
-  if ((len(channels) > 0) and (chan not in channels)):
+  if ((len(CHANNELS) > 0) and (chan not in CHANNELS)):
     return None
-  cmd = word[1].split(' ')[0]
+  cmd = word[1].split(' ')[0]  # when hearing 'Channel Message'
+  # cmd = word[3][1:]  # when hearing 'PRIVMSG'
   if (cmd == '!eightball' or cmd == '!8ball'):
-    if (LASTTIME + timeout <= now):
+    if (LASTTIME + TIMEOUT <= now):
       eightball_say(word, word_eol, userdata)
       LASTTIME = now
     else:
-      print "refusing to answer until %d seconds from now" % (LASTTIME + timeout - now)
+      print "refusing to answer until %d seconds from now" % (LASTTIME + TIMEOUT - now)
     return xchat.EAT_PLUGIN
 LASTTIME = 0
 xchat.hook_print('Channel Message', eightball_trigger)
+# xchat.hook_server('PRIVMSG', eightball_trigger)
 xchat.hook_print('Your Message', eightball_trigger)
 
 
