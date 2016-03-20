@@ -7,7 +7,7 @@
 
 # -- config
 
-# key is an IRC mask 
+# key is an IRC mask
 #  (why isn't there something in xchat for matching? I gotta cook this
 #   into a re.compile() to make it work. foo.)
 # colour is an int for mIRC colour codes
@@ -17,8 +17,9 @@ PEOPLE = {
   '*!*@Rizon-A43DFFC5.gwi.net': { 'colour': 'maroon' },
   '*!*@Rizon-5380BFEC.org': { 'colour': 'maroon' },
   '*!*@Rizon-87FC9C6.burl.east.myfairpoint.net': { 'colour': 'maroon' },
-  '*!HSG@94756A2A.E41A0DC3.4B34C0C0.IP': { 'colour': 'maroon' },
-  'Ross*!Ross@*.myvzw.com': { 'colour': 'purple' }
+  '*!*@94756A2A.E41A0DC3.4B34C0C0.IP': { 'colour': 'maroon' },
+  '*!*@*.maine.res.rr.com': { 'colour': 'maroon' },
+  '*!Ross@*.myvzw.com': { 'colour': 'purple' }
 }
 # 'HSE!*@*.myfairpoint.net': { 'colour': 'maroon' },
 # 'moses!*@deunan': { 'colour': '\00309,02' },
@@ -31,7 +32,7 @@ __module_author__  =  "Mozai <moc.iazom@sesom>"
 import re, xchat
 
 MIRC_COLOURS = {
-  'normal':'\017', 'bold':'\002', 'underline':'\037', 
+  'normal':'\017', 'bold':'\002', 'underline':'\037',
   'reverse':'\026', 'italic':'\026', 'beep':'\007',
 # \003<fore>,<back>
   'white':'\00300',  'black':'\00301',
