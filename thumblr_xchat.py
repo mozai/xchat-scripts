@@ -101,6 +101,9 @@ def _search_and_emit(context, tagname):
   blurb1 = "\x02\x0302tu\x6Dblr\x0F {}"
   if foundposts:
     blurb2 = foundposts[0]['photo_stage_img']
+    # Indexer insists
+    blurb2 = blurb2.replace('_500.jpg', '_1280.jpg')
+    blurb2 = blurb2.replace('_500.png', '_1280.png')
   else:
     blurb2 = "(didn\'t find anything for {}".format(tagname)
   context.command("say " + blurb1.format(blurb2))
@@ -116,7 +119,7 @@ def checkPrint(word, word_eol, userdata):
   if ((len(CHANNELS) > 0) and (chan not in CHANNELS)):
     return None
   words = word[1].split()
-  if words[0] != TRIGGER or len(words) < 2:
+  if len(words) < 2 or words[0] != TRIGGER:
     return
   tagname = words[1].lstrip('#')
   if not tagname:
