@@ -12,8 +12,7 @@
 
     [mspa]
     name=MSPA rss feed
-    host=mspaintadventures.com
-    path=/rss/rss.xml
+    url=http://mspaintadventures.com/rss/rss.xml
     command=grubdate
     flair= according to my watch.
     trigger=.update
@@ -36,10 +35,6 @@
   http://www.gnu.org/copyleft/gpl.html
 
 """
-# blaaaargh, tried to make this conform to PEP-8 coding standards
-# but I refuse to give up mixedCase function names
-# and I refuse to use four-space indents, yuck.
-
 # -- config, stuff the user will want to mess with
 INI_FILE = '.xchat2/grubdate.ini'
 
@@ -53,13 +48,14 @@ import xchat
 # import commands
 import ConfigParser
 import dateutil.parser
-import httplib
 import re
+import requests
 import rfc822
+import threading
 import time
 
 __module_name__ = "grubdate"  # it's a Homestuck joke
-__module_version__ = "20150922"
+__module_version__ = "20160328"
 __module_description__ = "website update check"
 __module_author__ = "Mozai <moc.iazom@sesom>"
 
@@ -87,24 +83,6 @@ else:
 del(CONF, INI_FILE, INI_LOADED)  # don't wait for GC that won't happen
 
 
-def _latestSBaHJpath():
-  # special case.  The path changes on every update
-  # TODO: config setting for a regexp to search sites the proper path
-  #       so that any SITE[] can have this, not just Sweet Bro and Hella Jeff
-  conn = httplib.HTTPConnection('mspaintadventures.com', timeout=1)
-  conn.request('GET', '/sweetbroandhellajeff/')
-  text = conn.getresponse().read()
-  j = text.find('"><img src="new.jpg"')
-  i = text.rfind('=', 0, j)
-  if i > 0 and j > 0:
-    newn = '/sweetbroandhellajeff/archive/%s' % text[i + 1:j]
-    print '... checking', newn
-    return newn
-  else:
-    print "... didn't find the sbahj new.jpg link"
-    return False
-
-
 def _secsToPretty(ticks=0):
   " given ticks as a duration in seconds, in human-friendly units "
   day, remain = divmod(ticks, (24 * 60 * 60))
@@ -121,38 +99,60 @@ def _secsToPretty(ticks=0):
 
 
 def _getLastModified(site):
-  """ given a key for the SITES[] global dict dict, returns age in seconds
-  if request is less than SITES[]['checkpause'] ago, returns cached answer
+  """ given an entry in the SITES[] global dict, returns age in seconds
+  if request is less than SITES[site]['checkpause'] ago, returns cached answer
   """
   now = time.mktime(time.gmtime())
-  if now >= (SITES[site]['lastchecked'] + SITES[site]['checkpause']):
-    if site == 'sbahj':
-      # special case
-      urpdoot = _latestSBaHJpath()
-      if urpdoot:
-        SITES[site]['path'] = urpdoot
-    conn = httplib.HTTPConnection(SITES[site]['host'], timeout=3)
-    conn.request("HEAD", SITES[site]['path'])
-    res = conn.getresponse()
-    if res.status >= 300:
-      print "QUACK %s responded with http %d %s" % (SITES[site]['host'], res.status, res.reason)
+  if now >= (site['lastchecked'] + site['checkpause']):
+    req = requests.request('HEAD', site['url'], timeout=3)
+    if req.status_code >= 300:
+      print "QUACK %s responded with http %d %s" % (site['url'], req.status_code, req.reason)
       return None
-    if res.getheader('Last-Modified'):
-      last_modified = res.getheader('Last-Modified')
+    if 'Last-Modified' in req.headers:
+      last_modified = req.headers['Last-Modified']
       timetuple = rfc822.parsedate(last_modified)
-      SITES[site]['lastmodified'] = time.mktime(timetuple)
-      SITES[site]['lastchecked'] = now
+      site['lastmodified'] = time.mktime(timetuple)
+      site['lastchecked'] = now
     else:
       # dirty methods ahoy
-      conn.request("GET", SITES[site]['path'])
-      resdoc = conn.getresponse().read()
+      # expects to see RSS XML or Atom XML
+      req = requests.request('GET', site['url'], timeout=3)
       now = time.mktime(time.gmtime())
-      matchobj = re.search(r'<pubdate>([^<]*)</pubdate>', resdoc, re.S | re.I)
-      if matchobj:
-        last_modified = matchobj.group(1)
+      matchobj1 = re.search(r'<pubdate>([^<]*)</pubdate>', req.text, re.S | re.I)
+      matchobj2 = re.search(r'<updated>([^<]*)</updated>', req.text, re.S | re.I)
+      if matchobj1:
+        last_modified = matchobj1.group(1)
         last_modified = dateutil.parser.parse(last_modified)
-        SITES[site]['lastmodified'] = time.mktime(last_modified.timetuple())
-  return SITES[site]['lastmodified']
+        site['lastmodified'] = time.mktime(last_modified.timetuple())
+      elif matchobj2:
+        last_modified = matchobj1.group(1)
+        last_modified = dateutil.parser.parse(last_modified)
+        site['lastmodified'] = time.mktime(last_modified.timetuple())
+      else:
+        print "QUACK didn't find date in %s" % (site['url'])
+        return None
+  return site['lastmodified']
+
+
+def _emit_lastmodified(context, site):
+  " (thread) get mtime of a site, respond into xchat context "
+  mtime = _getLastModified(site)
+  if mtime:
+    flair = site.get('flair', '')
+    now = time.mktime(time.gmtime())
+    if isinstance(context, str):
+      xchat.command("msg {} {} updated \002{}\002 ago{}".format(context, site['name'], _secsToPretty(now - mtime), flair))
+    elif context is not None:
+      context.command("say {} updated \002{}\002 ago{}".format(site['name'], _secsToPretty(now - mtime), flair))
+    else:
+      print "%s updated \002%s\002 ago%s" % (SITES[site]['name'], _secsToPretty(now - mtime), flair)
+  else:
+    if isinstance(context, str):
+      xchat.command("msg {} {} couldn't get a decent update; try again later?".format(context, site['name']))
+    elif context is not None:
+      context.command("say {} couldn't get a decent update; try again later?".format(site['name']))
+    else:
+      print "{} couldn't get a decent update; try again later?".format(site['name'])
 
 
 def checkCommand(word, word_eol, userdata):
@@ -160,59 +160,30 @@ def checkCommand(word, word_eol, userdata):
       prints to local client window
   """
   del(word_eol, userdata)  # shut up, pylint
-  flair = ''
-  site = ''
+  site = None
+  context = None
   for i in SITES:
     if ('command' in SITES[i]) and (word[0] == SITES[i]['command']):
       site = i
-  if site == '':
-    print "huh? no site with matching command:", word[0]
-    return xchat.EAT_NONE
-  if 'flair' in SITES[site]:
-    flair = SITES[site]['flair']
-  now = time.mktime(time.gmtime())
-  modtime = _getLastModified(site)
-  if modtime:
-    print "%s updated \002%s\002 ago%s" % (SITES[site]['name'], _secsToPretty(now - modtime), flair)
+  if site is None:
+    for i in SITES:
+      if ('command' in SITES[i]) and (word[0] == SITES[i]['command'] + '_emote'):
+        site = i
+        context = xchat.get_context()
+  if site is None:
+    return None
   else:
-    print "%s couldn't get a decent update; try again later?" % SITES[site]['name']
-  return xchat.EAT_ALL
+    _emit_lastmodified(context, site)
+    return xchat.EAT_PLUGIN
 
 
-def checkCommandEmote(word, word_eol, userdata):
-  """ respond to "/(SITES[]['command'])_emote" messages
-      emotes to current context
-  """
-  del(word_eol, userdata)  # shut up, pylint
-  flair = ''
-  site = ''
-  for i in SITES:
-    if ('command' in SITES[i]) and (word[0] == SITES[i]['command'] + '_emote'):
-      site = i
-  if site == '':
-    print "huh? no site with matching command:", word[0]
-    return xchat.EAT_NONE
-  if 'flair' in SITES[site]:
-    flair = SITES[site]['flair']
-  now = time.mktime(time.gmtime())
-  modtime = _getLastModified(site)
-  if modtime:
-    xchat.command("me is certain %s updated \002%s\002 ago%s" % (SITES[site]['name'], _secsToPretty(now - modtime), flair))
-    SITES[site]['lastasked'] = now
-  else:
-    print "%s couldn't get a decent update; try again later?" % SITES[site]['name']
-  return xchat.EAT_ALL
-
-
-def _in_list_or_string(needle, haystack):
+def _inany(needle, haystack):
   # because 'needle' in 'haystackneedle' returns True
   if haystack is None:
     return False
-  if type(haystack) == (type({})):
+  if isinstance(haystack, (list, tuple, dict)):
     return needle in haystack
-  elif type(haystack) in (type(()), type([])):
-    return needle in haystack
-  elif isinstance(haystack, str):
+  elif isinstance(haystack, (str, unicode)):
     return needle == haystack
   else:
     raise TypeError('unknown haystack type:', type(haystack))
@@ -225,43 +196,37 @@ def checkPrint(word, word_eol, userdata):
   """
   del(word_eol, userdata)  # shut up, pylint
   context = xchat.get_context()
-  nicks = [i.nick.lower() for i in context.get_list('users')]
   chan = context.get_info('channel')
-  cmd = word[1].split(' ')[0]
+  who = word[0]
+  cmd = word[1].split()[0]
+  now = int(time.time())
   if cmd == '':
     return None
-  flair = ''
-  site_key = None
-  for site in SITES:
-    if SITES[site].get('trigger') == cmd:
-      if 'channels' in SITES[site] and _in_list_or_string(chan, SITES[site]['channels']):
-        site_key = site
+  site = None
+  for site_key in SITES:
+    if SITES[site_key].get('trigger') == cmd:
+      if 'channels' in SITES[site_key]:
+        if _inany(chan, SITES[site_key]['channels']):
+          site = SITES[site_key]
       else:
         # else no channels are mentioned
-        site_key = site
-  if not site_key:
+        site = SITES[site_key]
+  if not site:
     return None
+  nicks = [i.nick.lower() for i in context.get_list('users')]
   afraid_of = [i for i in nicks if i in AFRAID_OF]
   if afraid_of:
     print "(staying quiet because I'm scared of {})".format(afraid_of)
     return None
-  site = SITES[site_key]
-  flair = site.get('flair', '')
-
-  now = time.mktime(time.gmtime())
-  modtime = _getLastModified(site_key)
-  message = ''
-  if modtime:
-    message = "%s updated \002%s\002 ago%s" % (site['name'], _secsToPretty(now - modtime), flair)
+  pauseleft = site['lastasked'] + site['askpause'] - now
+  if pauseleft > 0:
+    # send message to just this person, and don't reset the lastasked time
+    context = who
   else:
-    message = "%s update wasn't found; try again later." % site['name']
-    xchat.command('msg %s %s' % (word[0], message))
-    return xchat.EAT_PLUGIN
-  if now < site['lastasked'] + site['askpause']:
-    xchat.command('msg %s %s' % (word[0], message))
-  else:
-    context.command("me is certain %s" % message)
     site['lastasked'] = now
+  drone = threading.Thread(target=_emit_lastmodified, args=(context, site))
+  drone.daemon = True
+  drone.start()
   return xchat.EAT_PLUGIN
 
 
@@ -272,7 +237,7 @@ for SITE in SITES:
   if 'command' in SITES[SITE]:
     xchat.hook_command(SITES[SITE]['command'], checkCommand, help='show you %s age' % SITES[SITE]['name'])
     CLIST += '/' + SITES[SITE]['command'] + ' '
-    xchat.hook_command(SITES[SITE]['command'] + '_emote', checkCommandEmote, help='announces %s age' % SITES[SITE]['name'])
+    xchat.hook_command(SITES[SITE]['command'] + '_emote', checkCommand, help='announces %s age' % SITES[SITE]['name'])
     CLIST += '/' + SITES[SITE]['command'] + '_emote '
 print "\002commands:\002", CLIST
 
