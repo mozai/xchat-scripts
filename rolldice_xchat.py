@@ -29,7 +29,7 @@ def _roll(what):
       for j in range(int(n)):
         eachroll.append(random.randint(1, int(match.group(2))))
       if match.group(3):
-        eachroll.append(match.group(3))
+        eachroll.append(int(match.group(3)))
       sumroll = sum([j for j in eachroll])
       results.append(','.join([str(j) for j in eachroll]) + '=' + str(sumroll))
       continue
