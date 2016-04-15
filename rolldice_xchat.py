@@ -49,7 +49,7 @@ def _roll(what):
       results.append(''.join([faces[j] for j in eachroll]) + ':' + str(sumroll))
       continue
     results.append(i + '?')
-  return ' '.join(results)
+  return '  '.join(results)
 
 
 def checkCommand(word, word_eol, userdata):
@@ -72,11 +72,14 @@ def checkPrint(word, word_eol, userdata):
     return xchat.EAT_NONE
   # who = word[0]
   words = word[1].split()
-  if words[0] in ['.dice', '.roll']:
-    if now >= TIMEOUTS[chan]:
-      return xchat.NONE
+  print repr(words[0]) 
+  if words[0] in ('.dice', '.roll'):
+    print 'inside'
+    if now <= TIMEOUTS[chan]:
+      return xchat.EAT_NONE
     if len(words) < 2:
       words.append('2d6')
+    print repr(words) 
     result = _roll(words[1:])
     if result:
       TIMEOUTS[chan] = now + TIMEOUT
@@ -85,4 +88,4 @@ def checkPrint(word, word_eol, userdata):
 xchat.hook_print('Channel Message', checkPrint)
 xchat.hook_print('Your Message', checkPrint)
 
-print "dice loaded (/roll, !roll)"
+print "dice loaded (/roll, .roll)"
