@@ -9,7 +9,8 @@ __module_description__ = "roll the bones."
 __module_author__ = "Mozai <moc.iazom@sesom>"
 
 TIMEOUT = 1
-TIMEOUTS = {}
+CHANNELS = ('#wetfish', '#test', '#farts')
+TIMEOUTS = {i: 0 for i in CHANNELS}
 
 
 def _roll(what):
@@ -17,7 +18,7 @@ def _roll(what):
   for i in what:
     match = re.search(r'^(\d+)$', i)
     if match:
-      results.append(random.randint(1, int(match.group(1))))
+      results.append(str(random.randint(1, int(match.group(1)))))
       continue
     match = re.search(r'^(\d*)d(\d+)([+-]\d+)?$', i)
     if match:
@@ -30,10 +31,11 @@ def _roll(what):
       if match.group(3):
         eachroll.append(match.group(3))
       sumroll = sum([j for j in eachroll])
-      results.append(','.join(eachroll) + '=' + sumroll)
+      results.append(','.join([str(j) for j in eachroll]) + '=' + str(sumroll))
       continue
     match = re.search(r'^(\d*)dF$', i)
     if match:
+      faces = ('-', '0', '+')
       n = match.group(1)
       if not n:
         n = 4
@@ -42,9 +44,9 @@ def _roll(what):
         eachroll.append(random.randint(0, 2))
       sumroll = sum([j for j in eachroll]) - n
       if sumroll >= 0:
-        sumroll = '+' + sumroll
+        sumroll = '+' + str(sumroll)
       eachroll.sort()
-      results.append(''.join(eachroll) + ':' + sumroll)
+      results.append(''.join([faces[j] for j in eachroll]) + ':' + str(sumroll))
       continue
     results.append(i + '?')
   return ' '.join(results)
@@ -52,10 +54,13 @@ def _roll(what):
 
 def checkCommand(word, word_eol, userdata):
   del(word_eol, userdata)  # shut up, pylint
-  if word == ['roll', 'dice']:
-    print "rolled dice: " + _roll(word)
-    return xchat.EAT_PLUGIN
-  return
+  if word[1:]:
+    print "rolled dice: " + _roll(word[1:])
+  else:
+    print "rolled dice: " + _roll(['2d6'])
+  return xchat.EAT_PLUGIN
+xchat.hook_command('roll', checkCommand, help='roll the bones, XdY+Z')
+xchat.hook_command('dice', checkCommand, help='roll the bones, XdY+Z')
 
 
 def checkPrint(word, word_eol, userdata):
@@ -63,17 +68,21 @@ def checkPrint(word, word_eol, userdata):
   now = int(time.time())
   context = xchat.get_context()
   chan = context.get_info('channel')
+  if chan not in TIMEOUTS:
+    return xchat.EAT_NONE
   # who = word[0]
   words = word[1].split()
   if words[0] in ['.dice', '.roll']:
-    if now >= TIMEOUTS.get(chan, 0):
+    if now >= TIMEOUTS[chan]:
       return xchat.NONE
     if len(words) < 2:
       words.append('2d6')
     result = _roll(words[1:])
     if result:
-      TIMEOUTS[chan] = now
+      TIMEOUTS[chan] = now + TIMEOUT
       context.command("me rolls " + result)
       return xchat.EAT_PLUGIN
+xchat.hook_print('Channel Message', checkPrint)
+xchat.hook_print('Your Message', checkPrint)
 
-
+print "dice loaded (/roll, !roll)"
