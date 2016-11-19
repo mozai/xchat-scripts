@@ -1,12 +1,12 @@
-""" Xchat module for controlling the Clementine media player
-"""
+" Hexchat module for controlling the Clementine media player "
+# Python 3.x ; don't need str.encode('utf8') anymore
 from __future__ import print_function
-import xchat
+import hexchat
 import dbus
 
 __module_name__ = "Clementine"
-__module_version__ = "20131201"
-__module_description__ = "control music from inside xchat"
+__module_version__ = "20161114"
+__module_description__ = "control music from inside hexchat"
 __module_author__ = "Mozai"
 
 
@@ -36,16 +36,16 @@ def clem_np(iface):
   if tna:
     tna = "\x02 by \x02".join(tna)
     tna = "\x02" + tna[:255] + "\x02"  # sanity check
-    xchat.command("me is listening to %s" % tna.encode('utf-8'))
+    hexchat.command("me is listening to {}".format(tna))
   elif loc:
     if loc.startswith('file:'):
       # I want not the full path
       loc = loc[loc.rfind('/', 0, loc.rfind('/')) + 1:]
       loc = loc[:255]  # sanity check
-    xchat.command("me is listening to \x02%s\x02" % loc.encode('utf-8'))
+    hexchat.command("me is listening to \x02%s\x02" % loc)
   else:
     print("clementine isn't playing")
-  return xchat.EAT_NONE
+  return hexchat.EAT_NONE
 
 
 def clem_play(iface):
@@ -90,8 +90,8 @@ def clem_info(iface):
   if mdata:
     blurb = ''
     for i in sorted(mdata.keys()):
-      blurb += "\x02%s\x02 %s " % (i, mdata[i])
-    print(blurb.encode('utf-8'))
+      blurb += "\x02{}\x02 {} ".format(i, mdata[i])
+    print(blurb)
   else:
     print("clementine not playing?")
 
@@ -99,6 +99,7 @@ def clem_info(iface):
 def clem_help(iface):
   del(iface)  # shut up pylint
   print('\x02/clem\x02 [ ' + ', '.join(PARAMS.keys()) + ' ]')
+  print("\x02/np\x02 : emotes to current channel what you're listening to")
 
 PARAMS = {
   'np':    clem_np,
@@ -120,26 +121,25 @@ def clem(word, word_eol, userdata):
   if not iface:
     # Clementine not running; maybe some other media player
     print("clementine is not running?")
-    return xchat.EAT_PLUGIN
+    return hexchat.EAT_PLUGIN
   if (len(word)) < 2:
     goto = clem_info
   else:
     goto = PARAMS.get(word[1], clem_help)
   goto(iface)
-  return xchat.EAT_PLUGIN
-xchat.hook_command('clem', clem, help='/clem help for what you can do')
+  return hexchat.EAT_PLUGIN
+hexchat.hook_command('clem', clem, help='/clem help for what you can do')
 
 
 def nowplaying(word, word_eol, userdata):
-  " dispatcher that plays well with other xchat '/np' plugins "
+  " dispatcher that plays well with other hexchat '/np' plugins "
   iface = _clementine_iface()
   del(word, word_eol, userdata)
   if iface:
     clem_np(iface)
-  return xchat.EAT_NONE  # let another plugin pick it up
-xchat.hook_command('np', nowplaying, help='same as /clem np')
+  return hexchat.EAT_NONE  # let another plugin pick it up
+hexchat.hook_command('np', nowplaying, help='same as /clem np')
 
 print("\x02%s\x02 (%s) %s" % (__module_name__, __module_version__, __module_description__))
 clem_help(None)
-print("\x02/np\x02 : emotes to current channel what you're listening to")
 

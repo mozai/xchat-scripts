@@ -1,24 +1,27 @@
-""" Xchat module for controlling the Music On Console Player (MOCP)
+""" hexchat module for controlling the Music On Console Player (MOCP)
     program.  Inspired by similar work by kubicz10
 """
+# Python 3.x
 from __future__ import print_function
-import xchat
-import commands
+import hexchat
+from subprocess import check_output, call
 
 __module_name__ = "MOCP_control"
-__module_version__ = "20130620"
-__module_description__ = "control music from inside xchat"
+__module_version__ = "20161115"
+__module_description__ = "control music from inside hexchat"
 __module_author__ = "Mozai, kubicz10"
 
 
 def _mocp_state():
   " returns dict() of mocp state info, or None if not running "
-  infodump = commands.getoutput("mocp --info")
+  infodump = check_output('mocp --info'.split()).decode('utf8')
   if infodump.find('FATAL_ERROR: The server is not running!') > -1:
     # moc isn't running
     return None
   mocstate = {}
-  for line in str(infodump).split("\n"):
+  for line in infodump.split("\n"):
+    if ':' not in line:
+      continue
     fields = line.split(': ', 2)
     if fields[1].strip():
       mocstate[fields[0]] = fields[1].strip()
@@ -29,48 +32,48 @@ def _mocp_state():
 
 
 def mocp_play(mocstate):
-  if mocstate['State'] == "PLAY":
-    print ("mocp is already playing")
+  if mocstate.get('State') == "PLAY":
+    print("mocp is already playing")
   else:
     print("mocp starts playing")
-    commands.getoutput("mocp --play")
+    call("mocp --play".split())
 
 
 def mocp_stop(mocstate):
-  if mocstate['State'] == "STOP":
-    print ("mocp isn't playing")
+  if mocstate.get('State') == "STOP":
+    print("mocp isn't playing")
   else:
     print("stopping mocp")
-    commands.getoutput("mocp --stop")
+    call("mocp --stop".split())
 
 
 def mocp_pause(mocstate):
   # using toggle-pause because it's more likely what's expected
-  if mocstate['State'] == "PLAY":
+  if mocstate.get('State') == "PLAY":
     print("pausing mocp")
-    commands.getoutput("mocp --toggle-pause")
+    call("mocp --toggle-pause".split())
   elif mocstate['State'] == 'PAUSE':
     print("resuming mocp")
-    commands.getoutput("mocp --toggle-pause")
+    call("mocp --toggle-pause".split())
   else:
     print("mocp starts playing again")
-    commands.getoutput("mocp --play")
+    call("mocp --play".split())
 
 
 def mocp_next(mocstate):
   del(mocstate)
-  commands.getoutput("mocp --next")
+  call("mocp --next".split())
 
 
 def mocp_prev(mocstate):
   del(mocstate)
-  commands.getoutput("mocp --prev")
+  call("mocp --prev".split())
 
 
 def mocp_quit(mocstate):
   del(mocstate)
   print("killing moc")
-  commands.getoutput("moc --exit")
+  call("moc --exit".split())
 
 
 def mocp_info(mocstate):
@@ -78,28 +81,29 @@ def mocp_info(mocstate):
   mks.sort()
   blurb = ''
   for i in mks:
-    blurb += "\x02%s\x02 %s " % (i, mocstate[i])
-  print(blurb.encode('utf-8'))
+    blurb += "\x02{}\x02 {} ".format(i, mocstate[i])
+  print(blurb)
 
 
 def mocp_help(mocstate):
   del(mocstate)
-  print("\x02/mocp\x02 [" + ", ".join(PARAMS.keys()) + "]")
+  subcomms = ", ".join(PARAMS.keys())
+  print("\x02/mocp\x02 [{}".format(subcomms))
 
 
 def mocp_np(mocstate):
-  if mocstate['State'] == "STOP":
+  if mocstate.get('State') != "PLAY":
     # could be not running; maybe you're using a different music player
     return xchat.EAT_NONE
   blurb = [mocstate[i] for i in ('Artist', 'SongTitle') if mocstate.get(i)]
   if blurb:
     blurb = " - ".join(blurb)
-    xchat.command("me is listening to \x02%s\x02" % blurb.encode('utf-8'))
+    xchat.command("me is listening to \x02{}\x02".format(blurb))
   elif mocstate.get('File'):
     blurb = mocstate['File'][mocstate['File'].rfind('/') + 1:]
-    xchat.command("me is playing \x02%s\x02" % blurb.encode('utf-8'))
+    xchat.command("me is playing \x02{}\x02".format(blurb))
   else:
-    print("?? mocp info seems empty (%s)" % repr(mocstate.encode('utf-8')))
+    print("?? mocp info seems empty ({})".format(repr(mocstate)))
 
 
 PARAMS = {'help': mocp_help,
@@ -140,7 +144,7 @@ def nowplaying(word, word_eol, userdata):
 xchat.hook_command('np', nowplaying, help='same as /mocp np')
 
 
-print("\x02%s\x02 (%s) %s" % (__module_name__, __module_version__, __module_description__))
+print("\x02{}\x02 ({}) {}".format(__module_name__, __module_version__, __module_description__))
 mocp_help(None)
 print("\x02/np\x02 : emotes to current channel what you're listening to")
-commands.getoutput("mocp --server")  # starts it if necessary
+call("mocp --server".split())  # starts it if necessary
