@@ -45,10 +45,10 @@ ANSWERS = [
 
 def _eightball_name():
   return random.choice([
-    u'magic Eight-ball\u2122'.encode('utf8'),
+    'magic Eight-ball\u2122',
     '8ball',
     'eightball',
-    u'\u277d'.encode('utf8')
+    '\u277d'
     ])
 
 
