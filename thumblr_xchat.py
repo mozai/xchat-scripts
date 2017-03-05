@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 
 # -- init
 __module_name__ = "thumblr"
-__module_version__ = "20150319"
+__module_version__ = "20170203"
 __module_description__ = "image url burp"
 __module_author__ = "Mozai <moc.iazom@sesom>"
 
@@ -17,7 +17,7 @@ __module_author__ = "Mozai <moc.iazom@sesom>"
 # timeout between command responses
 # bots shouldn't spam, even when asked to
 COOLDOWN = 60
-CHANNELS = ['#farts', '#wetfish', '#test', ]
+CHANNELS = ['#farts', '#wetfish', '#test', '#homosuck' ]
 TRIGGER = '!thumblr'
 THUMBLR_URL = 'http://www.tu\x6D\x62lr.com/tagged/%s'
 USER_AGENT = 'Mozilla/5.0 (X11; Linux i686) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/27.0.1453.110 Safari/537.36'
@@ -28,17 +28,15 @@ LASTTIME = dict()
 for i in CHANNELS:
   LASTTIME[i] = 0
 
-
 # tu\x6D\x62lr is bigoted about bots
 URLOPENER = urllib.request.build_opener()
 URLOPENER.addheaders = [('User-agent', USER_AGENT)]
-
 
 def _force_to_int(text):
   return int('0' + ''.join([i for i in text if i.isdigit()]))
 
 
-def fetch_posts(tag, count=16):
+def search_tumblr_tags_for_img(tag, count=16):
   """ returns a list of dict
   tag can be any simple word, whitespaces become one '-' dash
   dict has keys ('href', 'photo_stage_img', 'notes', 'tags')
@@ -74,37 +72,48 @@ def fetch_posts(tag, count=16):
   return posts_found
 
 
+def _search_and_emit(context, tagname):
+  " (thread) search for 'phrase' images, emit result to hexchat context "
+  foundposts = search_tumblr_tags_for_img(tagname, 1)
+  if foundposts:
+    fname = foundposts[0]['photo_stage_img']
+    # Indexer insists
+    fname = fname.replace('_500.jpg', '_1280.jpg')
+    fname = fname.replace('_500.png', '_1280.png')
+  else:
+    fname = "(didn\'t find anything for {})".format(tagname)
+  if context:
+    context.command("say \x02\x0302tu\x6Dblr\x0F {}".format(fname))
+  else:
+    print("\x02\x0302tu\x6Dblr\x0F {}".format(fname))
+  return None
+
+
+def _create_drone(context, tagname):
+  drone = threading.Thread(target=_search_and_emit, args=(context, tagname))
+  drone.daemon = True  # allow parent to abandon this child
+  drone.start()  # go do your thing while I go away
+
+
 def thumblrCommand(word, word_eol, userdata):
   """ respond to "/thumblr (command)" messages
       prints to local client window
   """
   del(word_eol, userdata)  # shut up, pylint
   if len(word) == 1:
-    print("/thumblr tagname ie.: '/thumblr cosplay'")
+    # no parameter, help message
+    print("{} tagname ie.: '{} cosplay'".format(word[0], word[0]))
   elif len(word) == 2:
-    foundposts = fetch_posts(word[1], 1)
-    if foundposts:
-      blurb = "Have a look at %s".format(foundposts[0]['photo_stage_img'])
-      print(blurb)
+    tagname = word[1]
+    if word[0] == 'thumblr':
+      _create_drone(None, tagname)
+    elif word[0] == 'thumblr_say':
+      _create_drone(hexchat.get_context(), tagname)
   return hexchat.EAT_ALL
 
 
 hexchat.hook_command('thumblr', thumblrCommand, help='/thumblr tagname - gives URL')
-
-
-def _search_and_emit(context, tagname):
-  " (thread) search for 'phrase' images, emit result to hexchat context "
-  foundposts = fetch_posts(tagname, 1)
-  blurb1 = "\x02\x0302tu\x6Dblr\x0F {}"
-  if foundposts:
-    blurb2 = foundposts[0]['photo_stage_img']
-    # Indexer insists
-    blurb2 = blurb2.replace('_500.jpg', '_1280.jpg')
-    blurb2 = blurb2.replace('_500.png', '_1280.png')
-  else:
-    blurb2 = "(didn\'t find anything for {}".format(tagname)
-  context.command("say " + blurb1.format(blurb2))
-  return None
+hexchat.hook_command('thumblr_say', thumblrCommand, help='/thumblr tagname - gives URL')
 
 
 def checkPrint(word, word_eol, userdata):
@@ -125,13 +134,10 @@ def checkPrint(word, word_eol, userdata):
     # tell requester to wait
     context.command('msg %s %s timeout is %d seconds' % (word[0], TRIGGER, COOLDOWN))
     return hexchat.EAT_PLUGIN
-  # I'm doing something a little thread unsafe here, because I'm trusting
-  # the 'LASTTIME + COOLDOWN' above to keep too many threads
-  # from running at once
-  drone = threading.Thread(target=_search_and_emit, args=(context, tagname))
-  drone.daemon = True  # allow parent to abandon this child
-  drone.start()  # go do your thing while I go away
   LASTTIME[chan] = now
+  # I'm trusting the 'LASTTIME + COOLDOWN' above to keep too many threads
+  # from running at once
+  _create_drone(context, tagname)
   return hexchat.EAT_PLUGIN
 
 
@@ -142,5 +148,5 @@ hexchat.hook_print('Your Message', checkPrint)
 
 # -- main
 print("\x02Loaded {} v{}\x02".format(__module_name__, __module_version__))
-print("\x02commands:\x02 /thumblr tagname")
+print("\x02commands:\x02 /thumblr tagname, /thumblr_say tagname")
 print("\x02listens:\x02 {} tagname".format(TRIGGER))
