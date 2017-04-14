@@ -94,14 +94,14 @@ def mocp_help(mocstate):
 def mocp_np(mocstate):
   if mocstate.get('State') != "PLAY":
     # could be not running; maybe you're using a different music player
-    return xchat.EAT_NONE
+    return hexchat.EAT_NONE
   blurb = [mocstate[i] for i in ('Artist', 'SongTitle') if mocstate.get(i)]
   if blurb:
     blurb = " - ".join(blurb)
-    xchat.command("me is listening to \x02{}\x02".format(blurb))
+    hexchat.command("me is listening to \x02{}\x02".format(blurb))
   elif mocstate.get('File'):
     blurb = mocstate['File'][mocstate['File'].rfind('/') + 1:]
-    xchat.command("me is playing \x02{}\x02".format(blurb))
+    hexchat.command("me is playing \x02{}\x02".format(blurb))
   else:
     print("?? mocp info seems empty ({})".format(repr(mocstate)))
 
@@ -124,14 +124,14 @@ def mocp(word, word_eol, userdata):
   mocstate = _mocp_state()
   if not mocstate:
     print("MOC is not running?")
-    return xchat.EAT_NONE
+    return hexchat.EAT_NONE
   if (len(word)) < 2:
     goto = mocp_info
   else:
     goto = PARAMS.get(word[1], mocp_help)
   goto(mocstate)
-  return xchat.EAT_PLUGIN
-xchat.hook_command('mocp', mocp, help='/mocp help for what you can do')
+  return hexchat.EAT_PLUGIN
+hexchat.hook_command('mocp', mocp, help='/mocp help for what you can do')
 
 
 def nowplaying(word, word_eol, userdata):
@@ -140,8 +140,8 @@ def nowplaying(word, word_eol, userdata):
   mocstate = _mocp_state()
   if mocstate:
     mocp_np(mocstate)
-  return xchat.EAT_NONE  # let another plugin pick it up
-xchat.hook_command('np', nowplaying, help='same as /mocp np')
+  return hexchat.EAT_NONE  # let another plugin pick it up
+hexchat.hook_command('np', nowplaying, help='same as /mocp np')
 
 
 print("\x02{}\x02 ({}) {}".format(__module_name__, __module_version__, __module_description__))
