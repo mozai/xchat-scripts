@@ -9,21 +9,37 @@
 #   ... and the dict we get has 'xesam:' prefixed to most but not every key???
 # TODO: why does clementine lock-up if this module is reloaded or unloaded?
 from __future__ import print_function
-import hexchat
+import atexit  # see __atexit below
 import dbus
+import hexchat
 
 __module_name__ = "Clementine"
-__module_version__ = "20170414"
+__module_version__ = "20170415"
 __module_description__ = "control music from inside hexchat"
 __module_author__ = "Mozai"
 
+DBUS_SESSION = None
+CLEMENTINE = None
+
+
+def __atexit():
+  # maybe this will keep clementine from hanging on unload?
+  global DBUS_SESSION
+  if DBUS_SESSION:
+    DBUS_SESSION.close()
+
+
+atexit.register(__atexit)
+
 
 def _clementine_obj():
+  global DBUS_SESSION
+  global CLEMENTINE
   try:
-    i = dbus.SessionBus()
-    # I know it sucks to make a new session each time, but
-    #   they don't persist.  Maybe they time-out?
-    return i.get_object('org.mpris.MediaPlayer2.clementine', '/org/mpris/MediaPlayer2')
+    DBUS_SESSION = DBUS_SESSION or dbus.SessionBus()
+    # last time I tried, the dbus session didn't persist
+    CLEMENTINE = CLEMENTINE or DBUS_SESSION.get_object('org.mpris.MediaPlayer2.clementine', '/org/mpris/MediaPlayer2')
+    return CLEMENTINE
   except dbus.exceptions.DBusException as err:
     print("is clementine running? ({})".format(err))
     return None
@@ -70,48 +86,6 @@ def clem_np():
     print("don't know what clemtine is playing (no title, artist nor url?)")
 
 
-def clem_play(iface):
-  status = _clem_status()
-  if status:
-    if status['PlayStatus'] == 'Playing':
-      print("clementine is already playing")
-    else:
-      _clem_player().Play()
-
-
-def clem_stop(iface):
-  status = _clem_status()
-  if status:
-    if status['PlayStatus'] == 'Stopped':
-      print("clementine is already stopped")
-    else:
-      _clem_player().Stop()
-
-
-def clem_pause(iface):
-  clem = _clem_player()
-  if clem:
-    clem.PlayPause()  # toggle
-
-
-def clem_next(iface):
-  clem = _clem_player()
-  if clem:
-    clem.Next()
-
-
-def clem_prev(iface):
-  clem = _clem_player()
-  if clem:
-    clem.Previous()
-
-
-def clem_quit():
-  clem = _clem_player()
-  if clem:
-    clem.Quit()
-
-
 def clem_info():
   status = _clem_status()
   if status:
@@ -127,21 +101,9 @@ def clem_info():
 
 
 def clem_help():
-  print('\x02/clem\x02 [ ' + ', '.join(SUBCOMMANDS.keys()) + ' ]')
+  subcmds = 'help np info play stop pause next prev quit'.split()
+  print('\x02/clem\x02 [ ' + ', '.join(subcmds) + ' ]')
   print("\x02/np\x02 : emotes to current channel what you're listening to")
-
-
-SUBCOMMANDS = {
-  'np': clem_np,
-  'play': clem_play,
-  'stop': clem_stop,
-  'pause': clem_pause,
-  'next': clem_next,
-  'prev': clem_prev,
-  'info': clem_info,
-  'quit': clem_quit,
-  'help': clem_help,
-}
 
 
 def clem(word, word_eol, userdata):
@@ -151,11 +113,33 @@ def clem(word, word_eol, userdata):
   if not status:
     print("clementine is not running?")
     return hexchat.EAT_PLUGIN
-  if (len(word) > 1) :
-    goto = SUBCOMMANDS.get(word[1], clem_help)
+  subcommand = None
+  if (len(word) == 2):
+    subcommand = word[1]
+  if subcommand == 'np':
+    clem_np()
+  elif subcommand == 'info':
+    clem_info()
+  elif subcommand == 'play':
+    if status['PlayStatus'] == 'Playing':
+      print("clementine is already playing")
+    else:
+      _clem_player().Play()
+  elif subcommand == 'stop':
+    if status['PlayStatus'] == 'Stopped':
+      print("clementine is already stopped")
+    else:
+      _clem_player().Stop()
+  elif subcommand == 'pause':
+    _clem_player().PlayPause()  # toggle
+  elif subcommand == 'next':
+    _clem_player().Next()
+  elif subcommand == 'prev':
+    _clem_player().Previous()
+  elif subcommand == 'quit':
+    _clem_player().Quit()
   else:
-    goto = clem_help
-  goto()
+    clem_help()
 
 
 def nowplaying(word, word_eol, userdata):
