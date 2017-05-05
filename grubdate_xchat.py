@@ -1,89 +1,79 @@
 """
-  this is a python script for use with xchat v2.x.
-
-  INSTALL: put into ~/.xchat2/ and it should load on restart
-    or you can type '/py load grubdate-xchat.py' into xchat
-    it expects a 'grubdate.ini' file in the same directory.
+  this is a python script for use with hexchat v2.x. w/ python 3
 
   grubdate.ini will look like this:
     [DEFAULT]
-    checkpause=120
-    askpause=600
+    refresh=300
+    throttle=300
 
     [mspa]
-    name=MSPA rss feed
+    name=MSPA
     url=http://mspaintadventures.com/rss/rss.xml
     command=grubdate
-    flair= according to my watch.
-    trigger=.update
-    channels=#farts,#test
+    listento=#test,#farts
+    listenfor=.mspa
+    listenmsg={name} hasn't had a new page since {when}
+    announceto=#farts
+    announcemsg=Homestuck upd8!
 
-  The DEFAULT section is fallback for items not mentioned in others
-  Each other section defines a website and related commands for checking
-    to see if the website updated.
-  The items 'name', 'host' and 'path' are required, and should be obvious.
-  'command' becomes "/grubdate" and "/grubdate_emote"
-  'trigger' becomes listening for ".update" in channels
-  'channels' is a ,-seperated list of channels to listen in (none means all)
-  'flair' is added on the end of "%name updated %time ago%flair"
-  'checkpause' is how many seconds to cache checking the website
-  'askpause' is how many seconds until a trigger will speak out loud again
-
-  AUTHOR: Moses Moore <moc.iazom@sesom>
-
-  If you care, pretend this was released under the GPL license
-  http://www.gnu.org/copyleft/gpl.html
-
+  The DEFAULT section is fallback for items not mentioned in sections.
+  'name': human friendly name (required)
+  'url': site to check (required)
+  'refresh': time between checks (default: 300 seconds, min 120 seconds)
+  'throttle': time between answering listenfor triggers (default: 60 seconds)
+  'command': the /slash command you can type to get an answer
+  'listento': channels to listen for listenfor commands
+  'listenfor': if someone says this on a line by itself, respond with info
+  'listenmsg': how to reply (default: '{name} updated \x02{when}\x02'
+  'announceto': if the url updates, announce to these channels
+  'announcemsg': what to say on update (default: '* {name} updated *')
 """
-# -- config, stuff the user will want to mess with
-INI_FILE = '.xchat2/grubdate.ini'
-
-# for irc://rizon.net/#farts
-# don't speak if this nick is in the channel
-AFRAID_OF = ('jade_harley',)
-AFRAID_OF = [str.lower(A) for A in AFRAID_OF]
-
-# -- init, stuff we do only once
-import xchat
-# import commands
-import ConfigParser
-import dateutil.parser
+# Python 3.x
+# rewrote this to use hook_timer() instead of multithreading
+#  because multithreating makes hexchat 2.12 hang and crash
+import hexchat
+from configparser import ConfigParser
+from email.utils import parsedate_tz, mktime_tz
 import re
-import requests
-import rfc822
-import threading
 import time
-
+import os
+import urllib.request
 __module_name__ = "grubdate"  # it's a Homestuck joke
-__module_version__ = "20160328"
+__module_version__ = "20170504"
 __module_description__ = "website update check"
 __module_author__ = "Mozai <moc.iazom@sesom>"
+DEBUG = True
 
-# read the grubdate.ini file
-CONF = ConfigParser.ConfigParser(allow_no_value=True)
-INI_LOADED = CONF.read(INI_FILE)
-if len(INI_LOADED) < 1:
-  INI_LOADED = CONF.read('./grubdate.ini')
-  print "...attempting to load ./grubdate.ini instead."
-if len(INI_LOADED) > 0:
-  SITES = dict()
-  for SITE in CONF.sections():
-    SITES[SITE] = dict()
-    for item in CONF.items(SITE):
-      SITES[SITE][item[0]] = item[1]
-    SITES[SITE]['askpause'] = int(SITES[SITE]['askpause'])
-    SITES[SITE]['checkpause'] = int(SITES[SITE]['checkpause'])
-    SITES[SITE]['lastasked'] = 0
-    SITES[SITE]['lastchecked'] = 0
-    SITES[SITE]['lastmodified'] = 0
-    if 'channels' in SITES[SITE]:
-      SITES[SITE]['channels'] = SITES[SITE]['channels'].split(',')
-else:
-  raise Exception('no config loaded; missing %s ?' % INI_FILE)
-del(CONF, INI_FILE, INI_LOADED)  # don't wait for GC that won't happen
+# -- config, stuff the user will want to mess with
+# because (he)xchat, I'll have to search many directories to find it
+INI_FILE = 'grubdate.ini'
+
+# TODO: don't speak if this nick (another bot) is in the channel
+# AFRAID_OF = ('jade_harley',)
+
+# how often the heartbeat pumps, to check websites, in miliseconds
+HB_TIME = 8 * 60 * 1000  # eight minutes
+
+# -- init
 
 
-def _secsToPretty(ticks=0):
+def _quack(msg):
+  " debug messages "
+  if DEBUG:
+    print("({}: {})".format(__module_name__, msg))
+
+
+def dump_state(word, word_eol, userdata):
+  " used for debugging "
+  global SITES
+  del(word_eol, userdata)  # shut up, pylint
+  print("dumping {} state data".format(__module_name__))
+  for site in SITES:
+    print("{}: {} ".format(site, repr(SITES[site])))
+  print("---")
+
+
+def _secs_to_pretty(ticks=0):
   " given ticks as a duration in seconds, in human-friendly units "
   day, remain = divmod(ticks, (24 * 60 * 60))
   hour, remain = divmod(remain, (60 * 60))
@@ -98,61 +88,154 @@ def _secsToPretty(ticks=0):
     return "less than a minute"
 
 
-def _getLastModified(site):
-  """ given an entry in the SITES[] global dict, returns age in seconds
-  if request is less than SITES[site]['checkpause'] ago, returns cached answer
-  """
-  now = time.mktime(time.gmtime())
-  if now >= (site['lastchecked'] + site['checkpause']):
-    req = requests.request('HEAD', site['url'], timeout=3)
-    if req.status_code >= 300:
-      print "QUACK %s responded with http %d %s" % (site['url'], req.status_code, req.reason)
+def nowtime():
+  return int(time.mktime(time.gmtime()))
+
+
+# read the grubdate.ini file
+def ini_load(ini_file):
+  " given filename.ini, sets global SITES dict "
+  global SITES
+  iniparser = ConfigParser(allow_no_value=True)
+  # have to search for where the ini could be
+  found = None
+  configdir = hexchat.get_info('configdir')
+  possible_dirs = (configdir + os.sep + 'addons', configdir, '.')
+  for i in possible_dirs:
+    found = iniparser.read(i + os.sep + ini_file)
+    if found:
+      ini_file = found
+      break
+  if not found:
+    raise Exception("Could not find config file {}".ini_file)
+  # so I tried using the ConfigParser object to hold state but
+  # turns out it will ONLY allow assigning strings, not integers
+  SITES = {}
+  now = nowtime()
+  for i in iniparser.keys():
+    if i == 'DEFAULT':
+      continue
+    SITES[i] = {}
+    site = SITES[i]
+    for j in iniparser[i].keys():
+      site[j] = iniparser[i].get(j)
+    if not site.get('url'):
+      print("{}: missing 'url' in [{}]".format(ini_file, i))
+      site['url'] = None
+      site['refresh'] = 86400 * 365  # something nonsensically long
+    site.setdefault('name', i)
+    site.setdefault('listento', '')
+    site['listento'] = site['listento'].split(',')
+    site.setdefault('announcemsg', '\x02* {name} updated!\x02')
+    site.setdefault('listenmsg', '{name} updated \x02{when}\x02 ago')
+    site.setdefault('throttle', 60)
+    site.setdefault('refresh', 300)
+    site['lastanno'] = now
+    site['atime'] = 0
+    site['mtime'] = 0
+  return SITES
+
+
+def _announce_update(site):
+  " bleat to the appropriate channels "
+  now = nowtime()
+  if site['mtime'] == 0:
+    # last-modified time is still empty? how'd we get here?
+    return None
+  if (site['lastanno'] + site['throttle']) > now:
+    # too soon since the last announcement, just stay mum
+    return None
+  if site.get('announceto'):
+    message = site.get('announcemsg')
+    message = message.replace('{name}', site['name'])
+    message = message.replace('{when}', _secs_to_pretty(now - site['mtime']))
+    targets = [i for i in site['announceto'] if i.startswith('#')]
+    for target in targets:
+      # can't use hexchat.get_context(None, channname)
+      # because that returns only the random first matching context
+      for channel in hexchat.get_list('channels'):
+        if channel.channel == target:
+          channel.context.command("say " + message)
+    targets = [i for i in site['announceto'] if not i.startswith('#')]
+    for target in targets:
+      # TODO: find user among many servers
+      # hexchat.command("msg {} {}".format(target, message))
+      print("NotImplemented msg % % .format({}, {})".format(target, message))
+  site['lastanno'] = now
+
+
+def _update_site(site):
+  # skips update if now < site['atime'] + site.get('refresh', 300))
+  now = nowtime()
+  if now <= (site['atime'] + site['refresh']):
+    return None
+  if not site.get('url'):
+    site['atime'] = now
+    return None
+  with urllib.request.urlopen(site['url'], timeout=2) as res:
+    site.pop('error', None)  # del(site['error']) without throwing KeyError
+    site['atime'] = now
+    if res.status >= 300:
+      site['error'] = "http {} {}".format(res.status, res.reason)
+      print("\002ERROR: grubdate could not fetch {} {}: \"{}\" ".format(site['name'], site['url'], site['error']))
       return None
-    if 'Last-Modified' in req.headers:
-      last_modified = req.headers['Last-Modified']
-      timetuple = rfc822.parsedate(last_modified)
-      site['lastmodified'] = time.mktime(timetuple)
-      site['lastchecked'] = now
-    else:
-      # dirty methods ahoy
-      # expects to see RSS XML or Atom XML
-      req = requests.request('GET', site['url'], timeout=3)
-      now = time.mktime(time.gmtime())
-      matchobj1 = re.search(r'<pubdate>([^<]*)</pubdate>', req.text, re.S | re.I)
-      matchobj2 = re.search(r'<updated>([^<]*)</updated>', req.text, re.S | re.I)
-      if matchobj1:
-        last_modified = matchobj1.group(1)
-        last_modified = dateutil.parser.parse(last_modified)
-        site['lastmodified'] = time.mktime(last_modified.timetuple())
-      elif matchobj2:
-        last_modified = matchobj1.group(1)
-        last_modified = dateutil.parser.parse(last_modified)
-        site['lastmodified'] = time.mktime(last_modified.timetuple())
-      else:
-        print "QUACK didn't find date in %s" % (site['url'])
-        return None
-  return site['lastmodified']
-
-
-def _emit_lastmodified(context, site):
-  " (thread) get mtime of a site, respond into xchat context "
-  mtime = _getLastModified(site)
-  if mtime:
-    flair = site.get('flair', '')
-    now = time.mktime(time.gmtime())
-    if isinstance(context, str):
-      xchat.command("msg {} {} updated \002{}\002 ago{}".format(context, site['name'], _secsToPretty(now - mtime), flair))
-    elif context is not None:
-      context.command("say {} updated \002{}\002 ago{}".format(site['name'], _secsToPretty(now - mtime), flair))
-    else:
-      print "%s updated \002%s\002 ago%s" % (SITES[site]['name'], _secsToPretty(now - mtime), flair)
+    webpage = str(res.read())
+    # expects to see RSS XML or Atom XML
+    # first {pubdate,updated} tag should be most recent
+    new_mtime = None
+    matchobj = re.search(r'<pubdate>([^<]*)</pubdate>', webpage, re.S | re.I)
+    if matchobj:
+      last_modified = matchobj.group(1)
+      new_mtime = mktime_tz(parsedate_tz(last_modified))
+    if not new_mtime:
+      matchobj = re.search(r'<updated>([^<]*)</updated>', webpage, re.S | re.I)
+      if matchobj:
+        last_modified = matchobj.group(1)
+        new_mtime = mktime_tz(parsedate_tz(last_modified))
+    if not new_mtime:
+      if res.getheader('Last-Modified'):
+        last_modified = res.getheader('Last-Modified')
+        new_mtime = mktime_tz(parsedate_tz(last_modified))
+  if new_mtime:
+    if new_mtime > site['mtime']:
+      site['mtime'] = new_mtime
+      return site['mtime']
   else:
-    if isinstance(context, str):
-      xchat.command("msg {} {} couldn't get a decent update; try again later?".format(context, site['name']))
-    elif context is not None:
-      context.command("say {} couldn't get a decent update; try again later?".format(site['name']))
-    else:
-      print "{} couldn't get a decent update; try again later?".format(site['name'])
+    site['error'] = "did not find pubdate/updated/last-modified in response"
+  return None
+
+
+def _update_sites(userdata):
+  global SITES
+  del(userdata)  # shut up, pylint
+  for i in SITES:
+    if nowtime() <= (SITES[i]['atime'] + SITES[i]['refresh']):
+      return None
+    retval = _update_site(SITES[i])
+    # how do I avoid the above from blocking the loop
+    # without using threads? beacuse spawning threads messes up hexchat
+    if retval is not None:
+      _announce_update(SITES[i])
+  return True  # keep hook_timer(n, f) going
+
+
+def _update_sites_once(userdata):
+  # gimmick to jump the first heartbeat
+  _update_sites(userdata)
+  return False  # end hook_timer(n, r) immediately after
+
+
+def emit_mtime(context, site):
+  if site['mtime'] == 0:
+    return None
+  ago = _secs_to_pretty(nowtime() - site['mtime'])
+  if context is None:
+    print("{} updated \002{}\002 ago".format(site['name'], ago))
+  elif isinstance(context, str):
+    hexchat.command("msg {} {} updated \002{}\002 ago".format(context, site['name'], ago))
+  else:
+    context.command("say {} updated \002{}\002 ago".format(site['name'], ago))
+    site['lastanno'] = nowtime()
 
 
 def checkCommand(word, word_eol, userdata):
@@ -160,93 +243,83 @@ def checkCommand(word, word_eol, userdata):
       prints to local client window
   """
   del(word_eol, userdata)  # shut up, pylint
-  site = None
-  context = None
   for i in SITES:
-    if ('command' in SITES[i]) and (word[0] == SITES[i]['command']):
-      site = i
-  if site is None:
-    for i in SITES:
-      if ('command' in SITES[i]) and (word[0] == SITES[i]['command'] + '_emote'):
-        site = i
-        context = xchat.get_context()
-  if site is None:
-    return None
-  else:
-    _emit_lastmodified(context, site)
-    return xchat.EAT_PLUGIN
+    if 'command' not in SITES[i]:
+      continue
+    if word[0] == SITES[i]['command']:
+      emit_mtime(None, SITES[i])
+      return hexchat.EAT_PLUGIN
+    elif word[0] == SITES[i]['command'] + '_emote':
+      emit_mtime(hexchat.get_context(), SITES[i])
+      return hexchat.EAT_PLUGIN
 
 
-def _inany(needle, haystack):
-  # because 'needle' in 'haystackneedle' returns True
-  if haystack is None:
-    return False
-  if isinstance(haystack, (list, tuple, dict)):
-    return needle in haystack
-  elif isinstance(haystack, (str, unicode)):
-    return needle == haystack
-  else:
-    raise TypeError('unknown haystack type:', type(haystack))
-
-
-def checkPrint(word, word_eol, userdata):
-  """ if it matches SITES[]['trigger'],
-      if it's been SITES[]['askpause'] since last, respond with an emote.
-      if it's less than that since last, respond with a privmsg.
-  """
-  del(word_eol, userdata)  # shut up, pylint
-  context = xchat.get_context()
+def eat_privmsg(word, word_eol, userdata):
+  context = hexchat.get_context()
+  who = word[0][1:word[0].find('!')]
+  # where = word[2]
   chan = context.get_info('channel')
-  who = word[0]
-  cmd = word[1].split()[0]
-  now = int(time.time())
-  if cmd == '':
+  what = word_eol[3][1:]
+  words = what.strip().split()
+  if not words:
+    # degenerate case of "nick PRIVMSG #channel :\r\n"
     return None
+  now = nowtime()
   site = None
-  for site_key in SITES:
-    if SITES[site_key].get('trigger') == cmd:
-      if 'channels' in SITES[site_key]:
-        if _inany(chan, SITES[site_key]['channels']):
-          site = SITES[site_key]
+  for i in SITES:
+    if SITES[i].get('listenfor') == words[0]:
+      if SITES[i].get('listento'):
+        if chan in SITES[i]['listento']:
+          site = SITES[i]
       else:
-        # else no channels are mentioned
-        site = SITES[site_key]
-  if not site:
+        # assume all channels if none are mentioned
+        site = SITES[i]
+  if site is None:
     return None
-  nicks = [i.nick.lower() for i in context.get_list('users')]
-  afraid_of = [i for i in nicks if i in AFRAID_OF]
-  if afraid_of:
-    print "(staying quiet because I'm scared of {})".format(afraid_of)
-    return None
-  pauseleft = site['lastasked'] + site['askpause'] - now
-  if pauseleft > 0:
+  if (site['lastanno'] + site['throttle']) > now:
     # send message to just this person, and don't reset the lastasked time
     context = who
+  # elif AFRAID_OF:
+  #   nicks = [i.nick.lower() for i in context.get_list('users')]
+  #   afraid = [i for i in nicks if i in AFRAID_OF]
+  #   if afraid:
+  #     send message to just this person, because I'm scared
+  #     context = who
   else:
     site['lastasked'] = now
-  drone = threading.Thread(target=_emit_lastmodified, args=(context, site))
-  drone.daemon = True
-  drone.start()
-  return xchat.EAT_PLUGIN
+  emit_mtime(context, site)
+  return hexchat.EAT_PLUGIN
 
 
 # -- main
-print "\002Loaded %s v%s\002" % (__module_name__, __module_version__)
+print("\002Loaded {} v{}\002".format(__module_name__, __module_version__))
+ini_load(INI_FILE)
+
+# the automatic thing
+# does the timer automatically stop when this module is unloaded?
+TIMER1 = hexchat.hook_timer(HB_TIME, _update_sites)
+TIMER2 = hexchat.hook_timer(1, _update_sites_once)
+
+# the /commands
 CLIST = ''
 for SITE in SITES:
   if 'command' in SITES[SITE]:
-    xchat.hook_command(SITES[SITE]['command'], checkCommand, help='show you %s age' % SITES[SITE]['name'])
+    hexchat.hook_command(SITES[SITE]['command'], checkCommand, help='show you %s age' % SITES[SITE]['name'])
     CLIST += '/' + SITES[SITE]['command'] + ' '
-    xchat.hook_command(SITES[SITE]['command'] + '_emote', checkCommand, help='announces %s age' % SITES[SITE]['name'])
+    hexchat.hook_command(SITES[SITE]['command'] + '_emote', checkCommand, help='announces %s age' % SITES[SITE]['name'])
     CLIST += '/' + SITES[SITE]['command'] + '_emote '
-print "\002commands:\002", CLIST
+print("\002commands:\002", CLIST)
+hexchat.hook_command('grubdate_dump', dump_state, help='(debug) dump SITES dict for grubdate')
+print("\002debug commands:\002 /grubdate_dump")
 
+# the triggers
 CLIST = ''
-xchat.hook_print('Channel Message', checkPrint)
-xchat.hook_print('Your Message', checkPrint)
 for SITE in SITES:
-  if 'trigger' in SITES[SITE]:
-    CLIST += SITES[SITE]['trigger'] + ' '
-print "\002triggers:\002", CLIST
+  if 'listenfor' in SITES[SITE]:
+    CLIST += SITES[SITE]['listenfor'] + ' '
+print("\002triggers:\002", CLIST)
+hexchat.hook_server("PRIVMSG", eat_privmsg)
 
-del(CLIST, SITE)  # don't wait for GC that will never happen
+
+# cleanup, don't wait for GC
+del(CLIST, SITE)
