@@ -11,37 +11,48 @@ __module_version__ = "20160412"
 __module_description__ = "roll the bones."
 __module_author__ = "Mozai <moc.iazom@sesom>"
 
-TIMEOUT = 1
-CHANNELS = ('#wetfish', '#test', '#farts')
+TIMEOUT = 2
+CHANNELS = '#wetfish #test #farts #botspam'.split()
 TIMEOUTS = {i: 0 for i in CHANNELS}
 
 
 def _roll(what):
   results = []
   for i in what:
+
+    # pick a number between 1 and n "d13" or just "13"
     match = re.search(r'^(\d+)$', i)
     if match:
-      results.append(str(random.randint(1, int(match.group(1)))))
+      x = int(match.group(1))
+      result = "d{} = {}".format(x, random.randint(1, x))
+      if len(result) > 128:
+        result = '(answer too large)'
+      results.append(result)
       continue
+
+    # D&D dice, "3d6+2"
     match = re.search(r'^(\d*)d(\d+)([+-]\d+)?$', i)
     if match:
-      n = match.group(1)
+      n = int(match.group(1) or '1')
+      m = int(match.group(2))
+      o = int(match.group(3) or '0')
       eachroll = []
-      if not n:
-        n = 1
       for j in range(int(n)):
-        eachroll.append(random.randint(1, int(match.group(2))))
-      if match.group(3):
-        eachroll.append(int(match.group(3)))
+        eachroll.append(random.randint(1, m) + o)
       sumroll = sum([j for j in eachroll])
-      results.append(','.join([str(j) for j in eachroll]) + ' = ' + str(sumroll))
+      result = '{} = {} = {}'.format(match.group(0),  ','.join([str(j) for j in eachroll]), str(sumroll))
+      if len(result) > 128:
+        result = '{} = {}'.format(match.group(0), sumroll)
+      if len(result) > 128:
+        result = '(answer too large)'
+      results.append(result)
       continue
+
+    # Fate dice, "4dF"
     match = re.search(r'^(\d*)dF$', i)
     if match:
-      faces = ('-', '0', '+')
-      n = match.group(1)
-      if not n:
-        n = 4
+      faces = ('-', '_', '+')
+      n = int(match.group(1) or '4')
       eachroll = []
       for j in range(int(n)):
         eachroll.append(random.randint(0, 2))
@@ -49,10 +60,25 @@ def _roll(what):
       if sumroll >= 0:
         sumroll = '+' + str(sumroll)
       eachroll.sort()
-      results.append(''.join([faces[j] for j in eachroll]) + ':' + str(sumroll))
+      result = '{} = {} = {}'.format(match.group(0), ''.join([faces[j] for j in eachroll]), sumroll)
+      if len(result) > 128:
+        result = '(answer too large)'
+      results.append(result)
       continue
+
+    # TODO: Greg Stolze's One-Roll-Engine (ORE)
+    # rolls nd10, sort and group them into matching sets
+    # '.roll 9ore10' -> '5-5-5 7-7 6-6 9 8 2'
+    # '9ore' assumes '9ore10'  'oreX' assumes '(X-1)oreX'
+    # cannot roll more dice than faces on each die
+
+    # else unrecognized method
     results.append(i + '?')
-  return '  '.join(results)
+
+  answer = '; '.join(results)
+  if len(answer) > 500:
+    answer = "(response too large)"
+  return answer
 
 
 def checkCommand(word, word_eol, userdata):
