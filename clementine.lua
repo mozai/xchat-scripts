@@ -5,6 +5,11 @@
     at best or wedge hexchat entirely at worse
     Clementine documentation says it uses MPRIS1 but it does not
 ]]
+--[[ "alexa play a lullaby" 
+     ɴᴏᴡ ᴘʟᴀʏɪɴɢ: Lullaby for Babies to go to Sleep | Songs for Kids | Baby LULLABY songs go to sleep
+     ─────────⚪───── ◄◄⠀▶⠀►►⠀ 00:25 / 00:39  ───○ 🔊 ᴴᴰ ⚙️ 
+]]
+
 local _name, _version, _descr = "clementine.lua", "20180910", "Clementine (/clem help)"
 local _mservice, _mpath = "org.mpris.MediaPlayer2", "/org/mpris/MediaPlayer2"
 
@@ -14,36 +19,45 @@ local _clem_qdbus = function(cmd)
         .. _mservice .. ".Player." .. cmd
 end
 
+local _clem_playbackstatus = function()
+    local s = io.popen(_clem_qdbus('PlaybackStatus')):read('a')
+    s = string.match(tostring(s), ".*%g")
+    return s
+end
+
 local cmd_clem = function(_, eol)
     local subcommand = eol[2]
     local res, emote, title, artist
     -- local album, url, length, position
     if (subcommand == 'help') or (subcommand == nil) then
         print("\x02/clem help\x02 this message")
-        print("\x02/clem pause\x02 toggle playing")
+        print("\x02/clem pause|play|stop\x02 control playing")
         print("\x02/clem next\x02 go to next song")
         print("\x02/clem status\x02 what Clementine is doing")
         print("\x02/np\x02 utter current song's name in channel")
-        return hexchat.EAT_PLUGIN
     elseif subcommand == 'pause' then
         --[[ prefer to 'stop' because paused livestreams act poorly on resume ]]
-        res = io.popen(_clem_qdbus('PlaybackStatus')):read('a')
-        if res == 'Playing' then
+        if _clem_playbackstatus == 'Playing' then
             os.execute(_clem_qdbus('Stop'))
         else
             os.execute(_clem_qdbus('Play'))
         end
+    elseif subcommand == 'play' then
+        if not (_clem_playbackstatus == 'Playing') then
+            os.execute(_clem_qdbus('Play'))
+        end
+    elseif subcommand == 'stop' then
+        if not (_clem_playbackstatus == 'Stopped') then
+            os.execute(_clem_qdbus('Stop'))
+        end
     elseif subcommand == 'next' then
         os.execute(_clem_qdbus('Next'))
     elseif subcommand == 'status' then
-        res = io.popen(_clem_qdbus('Metadata')):read('a')
-        print(res)
+        print(io.popen(_clem_qdbus('Metadata')):read('a'))
+        return hexchat.EAT_PLUGIN
     elseif subcommand == 'np' then
-        res = io.popen(_clem_qdbus('PlaybackStatus')):read('a')
-        if not (string.match(res, '%C*') == 'Playing') then
-            print("Clementine is not playing (" .. res .. ")")
-            return hexchat.EAT_PLUGIN
-        else
+        local status = _clem_playbackstatus()
+        if status == 'Playing' then
             res = io.popen(_clem_qdbus('Metadata')):read('a')
             emote = "is listening to"
             title = string.match(res, 'xesam:title: (%C*)')
@@ -65,8 +79,13 @@ local cmd_clem = function(_, eol)
             end
             ]]
             hexchat.command("me " .. emote)
+        else
+            print("Clementine is not playing (" .. status .. ")")
         end
+    else
+        return hexchat.EAT_NONE
     end
+    return hexchat.EAT_PLUGIN
 end
 
 local cmd_np = function(_, _)
