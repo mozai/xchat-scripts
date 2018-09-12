@@ -72,9 +72,10 @@ end
 
 --[[ MAIN ]]
 if hexchat then
-    hexchat.register("eightball.lua",
-        "shake the eightball (/8ball, " .. TRIGGER .. ")",
-        "20180909"
+    hexchat.register(
+        "eightball.lua",
+        "20180909",
+        "shake the eightball (/8ball, " .. TRIGGER .. ")"
     )
     hexchat.hook_print("Channel Message", msg_8ball)
     hexchat.hook_print("Your Message", msg_8ball)

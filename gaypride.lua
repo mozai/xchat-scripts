@@ -10,7 +10,7 @@ local RAINBOW = {
   '\x0312', '\x0302', '\x0313', '\x0306'
 }
 
-local function cmd_gaypride(word, eol)
+local function cmd_gaypride(_, eol)
     local phrase, pride = eol[2], ''
     local crumbsize = math.ceil(#phrase / #RAINBOW)
     local i = 0
@@ -23,9 +23,10 @@ end
 
 --[[ MAIN ]]
 if hexchat then
-    hexchat.register("gaypride.lua",
-        "rainbow flag (/gay <message>)",
-        "20180909"
+    hexchat.register(
+        "gaypride.lua",
+        "20180909",
+        "rainbow flag (/gay <message>)"
     )
     hexchat.hook_command("GAY", cmd_gaypride)
     hexchat.hook_command("PRIDE", cmd_gaypride)
