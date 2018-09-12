@@ -3,8 +3,12 @@
 """
 # Python 3.x
 from __future__ import print_function
-import hexchat
 from subprocess import check_output, call
+try:
+    from subprocess import DEVNULL # py3k
+except ImportError:
+    import os
+    DEVNULL = open(os.devnull, 'wb')
 
 __module_name__ = "MOCP_control"
 __module_version__ = "20161115"
@@ -131,7 +135,6 @@ def mocp(word, word_eol, userdata):
     goto = PARAMS.get(word[1], mocp_help)
   goto(mocstate)
   return hexchat.EAT_PLUGIN
-hexchat.hook_command('mocp', mocp, help='/mocp help for what you can do')
 
 
 def nowplaying(word, word_eol, userdata):
@@ -141,10 +144,18 @@ def nowplaying(word, word_eol, userdata):
   if mocstate:
     mocp_np(mocstate)
   return hexchat.EAT_NONE  # let another plugin pick it up
-hexchat.hook_command('np', nowplaying, help='same as /mocp np')
 
 
 print("\x02{}\x02 ({}) {}".format(__module_name__, __module_version__, __module_description__))
-mocp_help(None)
-print("\x02/np\x02 : emotes to current channel what you're listening to")
-call("mocp --server".split())  # starts it if necessary
+call("mocp --server".split(), stderr=DEVNULL)  # starts it if necessary
+if __name__ == '__main__':
+  # test mode
+  hexchat = type('hexchat', (object,), {"EAT_NONE": False, "command": print})
+  mocp_info(_mocp_state())
+else:
+  import hexchat
+  print("\x02%s\x02 (%s) %s" % (__module_name__, __module_version__, __module_description__))
+  hexchat.hook_command('np', nowplaying, help='same as /mocp np')
+  hexchat.hook_command('mocp', mocp, help='/mocp help for what you can do')
+  mocp_help(None)
+  print("\x02/np\x02 : emotes to current channel what you're listening to")
