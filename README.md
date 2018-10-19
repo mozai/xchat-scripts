@@ -18,7 +18,7 @@ timeout features to prevent abusing this to spam a channel.
 
 *TODO: a search regexp in case the latest update has a diff path each time.*
 
-mocp\_xchat.py
+mocp\_xchat.py and mocp.lua
 --------------
 A large improvement of the original MOCP\_info script by kubicz10 (released
 under a GNU copyleft license).  I might rewrite it from scratch soon,
@@ -33,12 +33,18 @@ This script adds commands to XChat to control MOC with XChat commands, so
 you do not need to leave your IRC session.  You can also (discretely) 
 emit to yourself or the current channel what you are currently listening to.
 
-clementine\_xchat.py
+Created a lua version on a whim.  Don't use both at the same time.
+
+clementine\_xchat.py and clementine.lua
 --------------------
 Another widget for controlling a media player without leaving IRC.
 Clementine is the player that looks awfully similar to Amarok, but
 uses Qt libraries instead of GTK, in case you're allergic to GNOMEs.
 It can be queried and instructed via dbus.
+
+... but hexchat is getting wedged on the python interpreter when it
+does DBus calls for some damn reason.  Switched over to lua
+and running the 'qbus' command-line tool instead.
 
 madlibs\_xchat.py
 -----------------
