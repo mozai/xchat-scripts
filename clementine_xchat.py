@@ -1,5 +1,8 @@
 " Hexchat module for controlling the Clementine media player "
 # Python 3.x ; don't need str.encode('utf8') anymore
+# 2018 March: having problems with the Dbus session, maybe because
+#    I can't keep it open indefinitely, or because I must remake it each
+#    time Clementine is stopped & started?
 # 2017 April: Clementine dropped support for MPRIS1
 #    now it's way more complicated
 # MPRIS1:
@@ -9,37 +12,28 @@
 #   ... and the dict we get has 'xesam:' prefixed to most but not every key???
 # TODO: why does clementine lock-up if this module is reloaded or unloaded?
 from __future__ import print_function
-import atexit  # see __atexit below
 import dbus
-import hexchat
+import os
 
 __module_name__ = "Clementine"
-__module_version__ = "20170415"
+__module_version__ = "20180321"
 __module_description__ = "control music from inside hexchat"
 __module_author__ = "Mozai"
 
-DBUS_SESSION = None
-CLEMENTINE = None
 
-
-def __atexit():
-  # maybe this will keep clementine from hanging on unload?
-  global DBUS_SESSION
-  if DBUS_SESSION:
-    DBUS_SESSION.close()
-
-
-atexit.register(__atexit)
+# import atexit  # see __atexit below
+# def __atexit():
+#  # maybe this will keep clementine from hanging on unload?
+#  if dbus
+#    DBUS_SESSION.close()
+# atexit.register(__atexit)
 
 
 def _clementine_obj():
-  global DBUS_SESSION
-  global CLEMENTINE
   try:
-    DBUS_SESSION = DBUS_SESSION or dbus.SessionBus()
-    # last time I tried, the dbus session didn't persist
-    CLEMENTINE = CLEMENTINE or DBUS_SESSION.get_object('org.mpris.MediaPlayer2.clementine', '/org/mpris/MediaPlayer2')
-    return CLEMENTINE
+    bus = dbus.bus.BusConnection(os.environ['DBUS_SESSION_BUS_ADDRESS'])
+    # advice from Stackoverflow since dbus.SessionBus() isn't stable for me
+    return bus.get_object('org.mpris.MediaPlayer2.clementine', '/org/mpris/MediaPlayer2')
   except dbus.exceptions.DBusException as err:
     print("is clementine running? ({})".format(err))
     return None
@@ -50,12 +44,6 @@ def _clem_status():
   if clem:
     iface = dbus.Interface(clem, dbus_interface='org.freedesktop.DBus.Properties')
     return iface.GetAll('org.mpris.MediaPlayer2.Player')
-
-
-def _clem_player():
-  clem = _clementine_obj()
-  if clem:
-    return dbus.Interface(clem, dbus_interface='org.mpris.MediaPlayer2.Player')
 
 
 def clem_np():
@@ -106,6 +94,12 @@ def clem_help():
   print("\x02/np\x02 : emotes to current channel what you're listening to")
 
 
+def _clem_player():
+  clem = _clementine_obj()
+  if clem:
+    return dbus.Interface(clem, dbus_interface='org.mpris.MediaPlayer2.Player')
+
+
 def clem(word, word_eol, userdata):
   " dispatcher for the commands in PARAMS dict() "
   del(word_eol, userdata)  # shut up, pylint
@@ -149,7 +143,14 @@ def nowplaying(word, word_eol, userdata):
   return hexchat.EAT_NONE  # let another plugin pick it up
 
 
-print("\x02%s\x02 (%s) %s" % (__module_name__, __module_version__, __module_description__))
-hexchat.hook_command('clem', clem, help='/clem help for what you can do')
-hexchat.hook_command('np', nowplaying, help='same as /clem np')
-clem_help()
+if __name__ == '__main__':
+  # test mode
+  hexchat = type('hexchat', (object,), {"EAT_NONE": False, "command": print})
+  clem_info()
+  clem_np()
+else:
+  import hexchat
+  print("\x02%s\x02 (%s) %s" % (__module_name__, __module_version__, __module_description__))
+  hexchat.hook_command('clem', clem, help='/clem help for what you can do')
+  hexchat.hook_command('np', nowplaying, help='same as /clem np')
+  clem_help()
