@@ -3,21 +3,24 @@
 """
 # 2016-02-17 : YouTube changed their API, they're making 'textDisplay'
 #    into an empty string
+# 2016-03-21 : now with threading so it won't lock up xchat during search
 import HTMLParser
 import json
 from random import random
 import re
+import threading
 import time
 import urllib
 import xchat
 
 # -- init
 __module_name__ = "utter_yt"
-__module_version__ = "20151106"
+__module_version__ = "20160321"
 __module_description__ = "Utter YouTube"
 __module_author__ = "Mozai <moc.iazom@sesom>"
 API_KEY = "get your own"
 TIMEOUT = 5  # seconds between emotes
+CHANNELS = ('#test', '#farts', '#wetfish')
 LASTUSED = {'#test': 0, '#farts': 0, '#wetfish': 0}  # also the list of allowed channels
 CHANCE = 0.02  # %age it will chatter, too high will get you banned
 
@@ -33,6 +36,7 @@ APIURL2 = 'https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&max
 # I want items[0]['snippet']['toplevelComment']['snippet']['textDisplay']
 YOUTUBELOGO = "\x0301,00You\x0300,04Tube\x0f"
 HTMLPARSER = HTMLParser.HTMLParser()  # god this is dumb just to get unescape()
+LASTUSED = {i:0 for i in CHANNELS}
 
 
 def fetchYTcomment(searchterms):
@@ -77,6 +81,15 @@ def checkCommand(word, word_eol, userdata):
     print "/ytbabble give me something to work with, eh?"
   return xchat.EAT_ALL
 
+def _barker(context, phrase):
+  wisdom = fetchYTcomment(phrase)
+  if wisdom:
+    # context.command('say {}'.format(wisdom))
+    context.prnt('{} \x0315"{}"\x0f'.format(YOUTUBELOGO, wisdom))
+  else:
+    context.prnt('{} \x0315(nothing found?)\x0f'.format(YOUTUBELOGO))
+    pass
+
 
 def checkPrint(word, word_eol, userdata):
   " listen to everything said, sometimes blurt out YouTube wisdom "
@@ -95,15 +108,12 @@ def checkPrint(word, word_eol, userdata):
   if random() > CHANCE:
     # rolled dice, not now
     return None
+  drone = threading.Thread(target=_barker, args=(context, word[1]))
+  drone.daemon = True  # permit death of parent
+  drone.start()
   LASTUSED[chan] = now
-  wisdom = fetchYTcomment(word[1])
-  if wisdom:
-    # context.command('say {}'.format(wisdom))
-    print '{} \x0315"{}"\x0f'.format(YOUTUBELOGO, wisdom)
-  else:
-    print '{} \x0315(nothing found?)\x0f'.format(YOUTUBELOGO)
-    pass
-  return xchat.EAT_NONE
+  return xchat.EAT_PLUGIN
+
 
 
 # -- main
