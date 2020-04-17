@@ -19,6 +19,7 @@ local function cmd_gaypride(_, eol)
         i = i + 1
     end
     hexchat.command("say " .. pride)
+    return hexchat.EAT_PLUGIN
 end
 
 --[[ MAIN ]]
