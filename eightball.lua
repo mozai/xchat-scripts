@@ -66,6 +66,8 @@ local function msg_8ball(word, eol)
     if os.difftime(os.time(), LASTBLEAT[chan]) > TIMEOUT then
         LASTBLEAT[chan] = os.time()
         hexchat.command("say " .. eightball_answer())
+    else
+        print("... staying quiet because " .. chan .. " timeout hasn't expired")
     end
     return hexchat.EAT_PLUGIN
 end
