@@ -36,6 +36,10 @@ local CANTRIPS = {
     cmd = "ud",
     help = "fetches a definition from UrbanDictionary",
     spell = "/usr/bin/wget -qO- 'https://www.urbandictionary.com/define.php?term={}' |/usr/bin/xmllint 2>/dev/null --nonet --html --nowrap --xpath 'string(//meta[@property=\"og:description\"]/@content)' -", },
+  { trigger = "!dadjoke",
+    cmd = "dadjoke",
+    help = "utter a dad-joke (fortune cookie)",
+    spell = "/usr/bin/fortune -n240 -s dadjokes |fmt -w240", },
 }
 
 --[[ INIT ]]
@@ -149,6 +153,11 @@ if hexchat then
     )
     hexchat.hook_print("Channel Message", msg_cantrip)
     hexchat.hook_print("Your Message", msg_cantrip)
+    for _,i in pairs(CANTRIPS) do
+        if i.cmd then  
+            hexchat.hook_command(i.cmd, cmd_cantrip, i.help)
+        end
+    end
     usage()
 else
   --[[ test mode ]]
