@@ -1,5 +1,5 @@
 """
-  this is a python script for use with xchat v2.x.
+  this is a python script for use with hexchat v2.x.
 
   It is for figuring out how the hook_* stuff really
   works, because the xchatpython.html document
@@ -8,8 +8,8 @@
   You should load this with `/py console` then
   `/py load spew_test.py` because you really
   don't want this to be automatically loaded up.
-
 """
+
 # -- config, stuff the user will want to mess with
 
 # server messages to hook_server() onto
@@ -25,7 +25,7 @@ SERVER_EVENTS = ['PRIVMSG', 'NOTICE', 'PART', 'KICK']
 #   and look for Settings > Advanced... > Text Events...  First paramter
 #   of xchat.hook_print() are the items in the left column, which you
 #   have to guess each of their purposes (but its not difficult).
-PRINT_EVENTS = [ ]
+PRINT_EVENTS = [ 'Channel Message', 'Channel Action', 'Your Message', 'Your Action' ]
 
 
 # -- init, stuff we do only once. No customer-servicable parts beyond here
@@ -35,49 +35,40 @@ __module_version__  = "20121108"[:8]
 __module_description__  = "Regugitate what is received by hook_* stuff"[:32]
 __module_author__  =  "Mozai <moc.iazom@sesom>"
 
-import xchat
+import hexchat
+import json
 
 def hook_spew(word, word_eol, userdata):
   """ /analthread co/42546122 or
       /analthread http://boards.4chan.org/co/res/42546122
   """
   spew = { 'word' : word, 'word_eol': word_eol, 'userdata': userdata }
-  print "*** " + repr(spew)
-  return xchat.EAT_NONE
+  print("*** " + json.dumps(spew))
+  return hexchat.EAT_NONE
 
 
 # -- main
-print "\002Loading %s v%s\002" % (__module_name__, __module_version__)
+print("\002Loading %s v%s\002" % (__module_name__, __module_version__))
 
-xchat.hook_command('spew', hook_spew, help='regugitate parameters')
-print "\002commands:\002 /spew [followed by nonsense data]"
+hexchat.hook_command('spew', hook_spew, help='regugitate parameters')
+print("\002commands:\002 /spew [followed by nonsense data]")
 
 for event in PRINT_EVENTS:
-  xchat.hook_print(event, hook_spew)
+  hexchat.hook_print(event, hook_spew, userdata={'event': event})
 
 for event in SERVER_EVENTS:
-  xchat.hook_server(event, hook_spew)
+  hexchat.hook_server(event, hook_spew, userdata={'event': event})
 
-# Things I saw that made xchat.hookserver() make more sense to me:
-#"""  { 'word': [
-#                ':Kyreen!~erh@amnet.net.au',
-#                'PRIVMSG',
-#                '#farts',
-#                ':yeah',
-#                'lets',
-#                'party'
-#               ],
-#      'word_eol': [
-#                   ':Kyreen!~erh@amnet.net.au PRIVMSG #farts :yeah lets party',
-#                   'PRIVMSG #farts :yeah lets party',
-#                   '#farts :yeah lets party',
-#                   ':yeah lets party',
-#                   'lets party',
-#                   'party'
-#                  ],
-#    'userdata': None}
-#"""
-#""" :kazoo_!~kazoo@Rizon-73073BD1.fullrate.dk JOIN :#fart """
-#""" :irc.thefear.ca PONG irc.thefear.ca :LAG791983761     """
-#""" :kazoo!~kazoo@Rizon-73073BD1.fullrate.dk QUIT :Ping timeout: 240 seconds """
-
+# things I saw:
+# { "userdata": {"event": "Your Message"},
+#   "word": ["Mozai", "!8ball am I pretty?", "@"],
+#   "word_eol": ["Mozai !8ball am I pretty? @", "!8ball am I pretty? @", "@"] }
+#
+# *** {
+#   "word": [":kate!hexafluorid@Fish-18io58.s.time4vps.cloud", "PRIVMSG", "#wetfish", ":not", "years", "at", "least"],
+#   "word_eol": [":kate!hexafluorid@Fish-18io58.s.time4vps.cloud PRIVMSG #wetfish :not years at least", "PRIVMSG #wetfish :not years at least", "#wetfish :not years at least", ":not years at least", "years at least", "at least", "least"],
+#   "userdata": {"event": "PRIVMSG"} }
+# *** {
+#   "word": ["kate", "not years at least"],
+#   "word_eol": ["kate not years at least", "not years at least"],
+#   "userdata": {"event": "Channel Message"} }

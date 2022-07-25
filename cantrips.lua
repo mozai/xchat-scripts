@@ -30,16 +30,28 @@ local CANTRIPS = {
   { trigger = "!fortune",
     cmd = "fortune",
     help = "gives a fortune cookie",
-    --[[ spell = "/usr/bin/fortune -s" }, ]]
+    --[[ spell = "/usr/bin/fortune -s" , ]]
     spell = "/usr/bin/fortune -n240 -s local |fmt -w240", },
   { trigger = "!ud",
     cmd = "ud",
     help = "fetches a definition from UrbanDictionary",
-    spell = "/usr/bin/wget -qO- 'https://www.urbandictionary.com/define.php?term={}' |/usr/bin/xmllint 2>/dev/null --nonet --html --nowrap --xpath 'string(//meta[@property=\"og:description\"]/@content)' -", },
+    spell = "/home/moses/bin/urbandict_lookup {}", },
   { trigger = "!dadjoke",
     cmd = "dadjoke",
     help = "utter a dad-joke (fortune cookie)",
     spell = "/usr/bin/fortune -n240 -s dadjokes |fmt -w240", },
+  { trigger = "!humanity",
+    cmd = "humanity",
+    help = "play a single round of Cards Against Humanity",
+    spell = "/home/moses/bin/humanity.sh" },
+  { trigger = "!showerthought",
+    cmd = "showerthought",
+    help = "get a random thought from the shower",
+    spell = "/home/moses/bin/fetchredditheadline showerthoughts" },
+  { trigger = "!tarot",
+    cmd = "tarot",
+    help = "Do a quick 3-card tarot casting",
+    spell = "/home/moses/bin/tarot_3card" }
 }
 
 --[[ INIT ]]
@@ -81,6 +93,7 @@ local function _cast_spell(cmd, param)
   end
   --[[ thin wrapper around "/bin/sh -c" ]]
   --[[ may block;  see above for guesses sur comment faire sans bloque ]]
+  print("Casting spell: " .. cmd)
   ph, err = io.popen(cmd)
   if ph then
     answer = ph:read("l") -- [[ only want first line ]]
