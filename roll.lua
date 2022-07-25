@@ -29,12 +29,30 @@ for _,i in pairs(CHANNELS) do LASTROLL[i] = 0 end
 math.randomseed((os.time() + (os.clock() * 1e6)) % 31612)
 
 local function rollORE(what)
-    local i,j,answer
+    local i,j,ii,jj,pool,answer
     --[[ TODO: Greg Stolze's One-Roll Engine (ORE) ]]
     --[[ roll Xd10, keep matching sets, wide = strong, high = accurate ) ]]
+    pool = {}
     i = 6
     j = 10
-    answer = "(not implemented yet)"
+    if what:match("^%d+(ore|ORE)") then
+      i = tonumber(what:match("^(%d+)(ore|ORE)"))
+    elseif what:match("^%d+(ore|ORE)%d+") then
+      i,_,j = what:match("^(%d+)(ore|ORE)(%d+)")
+      i = tonumber(i)
+      j = tonumber(j)
+    end
+    answer = "rolling " .. i .. "d" .. j .." ORE "
+    for ii=0,i,1 do
+      jj = math.random(j)
+      pool[jj] = (pool[jj] or 0) + 1
+    end
+    matches = {}
+    for i,j in pairs(pool) do
+      table.insert(matches, j .. "x" .. i)
+    end
+    table.sort(matches, function(a,b) return a > b end) 
+    answer = answer .. "(" .. table.concat(matches, ",") .. ")"
     return answer
 end
 
@@ -45,8 +63,8 @@ local function rollFudge(what)
     i = 4
     j = 0
     k = 0
-    if what:match("^%d+[dD]F$") then
-      i = what:match("^(%d+)[dD]F")
+    if what:match("^%d+[dD]F") then
+      i = tonumber(what:match("^(%d+)[dD]F"))
     end
     answer = "rolling " .. i .. "dF ("
     ii = 0
@@ -61,23 +79,16 @@ local function rollFudge(what)
         k = k + 1
         answer = answer .. "+"
       end
+      ii = ii + 1
     end
     answer =  answer .. ") " .. (j + k)
     return answer
 end
 
 
-local function roll(what)
-    local i,j,k,answer
+local function rollPolyhedra(what)
+    local i,j,k,ii,answer
     i = 2 j = 6 k = 0 --[[ default 2d6+0 ]]
-    if what:match("^ore%d([dD]%d)?$") then
-      --[[ pool of five d10 == ore5 or ore5d10 ]]
-      return rollORE(what)
-    elseif what:match("^%d[dD]F$") then
-      return rollFudge(what)
-    elseif what:match("^%d[dD]F$") then
-      return rollFudge(what)
-    end
     if what:match("^%d+[dD]%d+[+-]%d+$") then
       i,j,k = what:match("^(%d+)[dD](%d+)([-+]%d+)")
     elseif what:match("^%d+[dD]%d+$") then
@@ -91,29 +102,63 @@ local function roll(what)
       j = what:match("^[dD]?(%d+)")
       k = 0
     end
-    if i then
-      answer = 0
+    i = tonumber(i) or 0
+    j = tonumber(j) or 0
+    k = tonumber(k) or 0
+    answer = "rolling " .. what .. " ("
+    sum = 0
+    if (i > 0 and j > 0) then
       ii = 0
-      i = i + 0
       while (ii < i) do
-        answer = answer + math.random(j)
+        jj = math.random(j)
+        answer = answer .. jj
+        if (ii < i-1) then answer = answer .. "," end
+        sum = sum + jj
         ii = ii + 1
       end
-      answer = answer + k
-      return answer
+      answer = answer .. ")"
+      if (k > 0) then
+        answer = answer .. "+" .. k
+        sum = sum + k
+      elseif (k < 0) then
+        answer = answer .. k
+        sum = sum + k
+      end
+      answer = answer .. " " .. sum
     end
     return answer
 end
 
+local function roll(what)
+    if what:match("^%d+ore%d*") then
+      --[[ pool of five d10 == 5ore or 5ore10 ]]
+      return rollORE(what)
+    elseif what:match("^%d+ORE%d*") then
+      return rollORE(what)
+    elseif what:match("^%d+[dD]F$") then
+      return rollFudge(what)
+    elseif what:match("^%d[dD]F$") then
+      return rollFudge(what)
+    else
+      return rollPolyhedra(what)
+    end
+end
+
 local function cmd_roll(word, eol)
     local what
-    if word then
-        what = word[1]:match("^%s*%S+%s+(%S+)")
+    what = "2d6"
+    if word and word[2] then
+        if word[2]:match("%d*[dD]%d+") then
+            what = word[2]
+        elseif word[2]:match("%d*[dD]F") then
+            what = word[2]
+        elseif word[2]:match("%d+ore%d*") then
+            what = word[2]
+        elseif word[2]:match("%d+ORE%d*") then
+            what = word[2]
+        end
     end
-    if not what then
-        what = "2d6"
-    end
-    print("rolled " .. roll(what))
+    print(roll(what))
 end
 
 local function msg_roll(word, eol)
@@ -127,7 +172,7 @@ local function msg_roll(word, eol)
     if os.difftime(os.time(), LASTROLL[chan]) > TIMEOUT then
         answer = roll(what)
         if not (answer == nil) then
-            hexchat.command("me rolled " .. answer)
+            hexchat.command("me " .. answer)
             LASTROLL[chan] = os.time()
         end
     end
@@ -148,9 +193,10 @@ if hexchat then
     print("roll.lua : /roll or " .. TRIGGER .. " in configured channels")
 else
     local ii = 0
-    print("Testing, ten rolls of 2d6")
+    testcmd = {"roll", "3d6"}
+    print("Testing, ten rolls of " .. testcmd[2])
     while ii < 10 do
-        cmd_roll(nil, nil)
+        cmd_roll(testcmd, nil)
         ii = ii + 1
     end
 end
