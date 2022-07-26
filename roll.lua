@@ -33,17 +33,15 @@ local function rollORE(what)
     --[[ TODO: Greg Stolze's One-Roll Engine (ORE) ]]
     --[[ roll Xd10, keep matching sets, wide = strong, high = accurate ) ]]
     pool = {}
-    i = 6
-    j = 10
-    if what:match("^%d+(ore|ORE)") then
-      i = tonumber(what:match("^(%d+)(ore|ORE)"))
-    elseif what:match("^%d+(ore|ORE)%d+") then
-      i,_,j = what:match("^(%d+)(ore|ORE)(%d+)")
-      i = tonumber(i)
-      j = tonumber(j)
+    if what:match("^%d+ore%d*$") then
+      i,j = what:match("^(%d+)ore(%d*)")
+    elseif what:match("^%d+ORE%d*$") then
+      i,j = what:match("^(%d+)ORE(%d*)")
     end
+    i = tonumber(i) or 6
+    j = tonumber(j) or 10
     answer = "rolling " .. i .. "d" .. j .." ORE "
-    for ii=0,i,1 do
+    for ii=1,i,1 do
       jj = math.random(j)
       pool[jj] = (pool[jj] or 0) + 1
     end
@@ -74,7 +72,7 @@ local function rollFudge(what)
         j = j - 1
         answer = answer .. "-"
       elseif (jj == 2) then
-        answer = answer .. "·"
+        answer = answer .. "o"
       elseif (jj == 3) then
         k = k + 1
         answer = answer .. "+"
@@ -133,11 +131,9 @@ local function roll(what)
     if what:match("^%d+ore%d*") then
       --[[ pool of five d10 == 5ore or 5ore10 ]]
       return rollORE(what)
-    elseif what:match("^%d+ORE%d*") then
+    elseif what:match("^%d+ORE%d*$") then
       return rollORE(what)
     elseif what:match("^%d+[dD]F$") then
-      return rollFudge(what)
-    elseif what:match("^%d[dD]F$") then
       return rollFudge(what)
     else
       return rollPolyhedra(what)
@@ -168,7 +164,7 @@ local function msg_roll(word, eol)
     local cmd = word[2]:match("^%s*(%S+)")
     if not (cmd == TRIGGER) then return hexchat.EAT_NONE end
     local what = word[2]:match("^%s*%S+%s+(%S+)")
-    if not (what) then what = "2d6" end
+    if not (what) then what = "2d6" print("using default 2d6") end
     if os.difftime(os.time(), LASTROLL[chan]) > TIMEOUT then
         answer = roll(what)
         if not (answer == nil) then
