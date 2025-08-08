@@ -40,6 +40,8 @@ local function rollORE(what)
     end
     i = tonumber(i) or 6
     j = tonumber(j) or 10
+    if j > 63 then j = 64 end
+    if i > j then i = j end
     answer = "rolling " .. i .. "d" .. j .." ORE "
     for ii=1,i,1 do
       jj = math.random(j)
@@ -64,6 +66,7 @@ local function rollFudge(what)
     if what:match("^%d+[dD]F") then
       i = tonumber(what:match("^(%d+)[dD]F"))
     end
+    if i > 64 then i = 64 end
     answer = "rolling " .. i .. "dF ("
     ii = 0
     while (ii < i) do
@@ -99,11 +102,23 @@ local function rollPolyhedra(what)
       i = 1
       j = what:match("^[dD]?(%d+)")
       k = 0
+    else
+      --[[ rachel would do "!roll jizz" ]]
+      return nil
     end
     i = tonumber(i) or 0
     j = tonumber(j) or 0
     k = tonumber(k) or 0
-    answer = "rolling " .. what .. " ("
+    if i > 63 then i = 64 end
+    if j > 65535 then j = 65535 end
+    if k > 65535 then k = 65535 end
+    if k > 0 then
+        answer = "rolling " .. i .. "d" .. j .. "+" .. k .. " ("
+    elseif k < 0 then
+        answer = "rolling " .. i .. "d" .. j .. "-" .. k .. " ("
+    else
+        answer = "rolling " .. i .. "d" .. j .. " ("
+    end
     sum = 0
     if (i > 0 and j > 0) then
       ii = 0
